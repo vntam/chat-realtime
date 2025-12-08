@@ -72,22 +72,26 @@ export default function ConversationList() {
   return (
     <div className="flex flex-col h-full">
       {/* Search bar */}
-      <div className="p-3 border-b border-border">
+      <div className="p-3 border-b border-gray-200">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <Input
             type="text"
             placeholder="Tìm kiếm hội thoại..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 pr-3"
+            className="pl-9 pr-3 bg-gray-50 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl transition-smooth"
           />
         </div>
       </div>
 
       {/* Create conversation button */}
-      <div className="p-3 border-b border-border">
-        <Button className="w-full" size="sm" onClick={() => setShowCreateModal(true)}>
+      <div className="p-3 border-b border-gray-200">
+        <Button 
+          className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-lg shadow-blue-500/30 transition-smooth rounded-xl" 
+          size="sm" 
+          onClick={() => setShowCreateModal(true)}
+        >
           <Plus className="w-4 h-4 mr-2" />
           Tạo hội thoại mới
         </Button>
@@ -100,10 +104,10 @@ export default function ConversationList() {
       />
 
       {/* Conversation list */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto scrollbar-thin">
         {isLoading ? (
           <div className="flex items-center justify-center h-32">
-            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
           </div>
         ) : filteredConversations.length === 0 ? (
           <div className="p-4 text-center text-sm text-muted-foreground">
@@ -114,13 +118,15 @@ export default function ConversationList() {
             <button
               key={conversation.id}
               onClick={() => selectConversation(conversation)}
-              className={`w-full p-4 flex items-start gap-3 hover:bg-accent transition-colors border-b border-border text-left ${
-                selectedConversation?.id === conversation.id ? 'bg-accent' : ''
+              className={`w-full p-4 flex items-start gap-3 transition-smooth border-b border-gray-100 text-left group ${
+                selectedConversation?.id === conversation.id 
+                  ? 'bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-l-blue-500' 
+                  : 'hover:bg-gray-50'
               }`}
             >
               {/* Avatar */}
-              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                <span className="text-lg font-semibold text-primary">
+              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-md group-hover:shadow-lg transition-smooth">
+                <span className="text-lg font-bold text-white">
                   {getConversationName(conversation)[0].toUpperCase()}
                 </span>
               </div>

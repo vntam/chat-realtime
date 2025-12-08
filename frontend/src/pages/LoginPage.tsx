@@ -90,21 +90,31 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <div className="flex items-center justify-center mb-4">
-            <div className="p-3 bg-primary rounded-lg">
-              <MessageSquare className="w-8 h-8 text-primary-foreground" />
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Gradient Background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50" />
+      
+      {/* Animated gradient orbs */}
+      <div className="absolute top-0 left-0 w-96 h-96 bg-gradient-to-br from-blue-400/30 to-indigo-400/30 rounded-full blur-3xl animate-pulse" />
+      <div className="absolute bottom-0 right-0 w-96 h-96 bg-gradient-to-br from-purple-400/30 to-pink-400/30 rounded-full blur-3xl animate-pulse delay-1000" />
+
+      <Card className="w-full max-w-md relative z-10 shadow-2xl border-0 bg-white/80 backdrop-blur-xl animate-fade-in">
+        <CardHeader className="space-y-1 pb-8">
+          <div className="flex items-center justify-center mb-6">
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl blur opacity-75 animate-pulse" />
+              <div className="relative p-4 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl shadow-lg">
+                <MessageSquare className="w-10 h-10 text-white" />
+              </div>
             </div>
           </div>
-          <CardTitle className="text-2xl text-center">
-            {isLogin ? 'Đăng nhập' : 'Đăng ký'}
+          <CardTitle className="text-3xl text-center font-bold gradient-text">
+            {isLogin ? 'Chào mừng trở lại' : 'Tạo tài khoản'}
           </CardTitle>
-          <CardDescription className="text-center">
+          <CardDescription className="text-center text-base pt-2">
             {isLogin
-              ? 'Nhập email và mật khẩu để đăng nhập'
-              : 'Tạo tài khoản mới để bắt đầu chat'}
+              ? 'Đăng nhập để tiếp tục trò chuyện với bạn bè'
+              : 'Tạo tài khoản mới để bắt đầu kết nối'}
           </CardDescription>
         </CardHeader>
         <CardContent>

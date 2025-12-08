@@ -49,47 +49,69 @@ export default function ChatMessages() {
   const groupedMessages = groupMessagesByDate(messages)
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 space-y-6">
+    <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-thin">
       {groupedMessages.map(([date, msgs]) => (
         <div key={date}>
           {/* Date divider */}
-          <div className="flex items-center justify-center my-4">
-            <div className="px-3 py-1 bg-muted rounded-full text-xs text-muted-foreground">
+          <div className="flex items-center justify-center my-6">
+            <div className="px-4 py-1.5 bg-muted/70 backdrop-blur rounded-full text-xs text-muted-foreground font-medium shadow-sm">
               {date}
             </div>
           </div>
 
           {/* Messages for this date */}
-          <div className="space-y-4">
-            {msgs.map((message) => {
+          <div className="space-y-3">
+            {msgs.map((message, index) => {
               const isOwnMessage = message.sender.id === user?.id
+              const showAvatar = !isOwnMessage && (index === msgs.length - 1 || msgs[index + 1]?.sender.id !== message.sender.id)
 
               return (
                 <div
                   key={message.id}
-                  className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
+                  className={`flex gap-2 ${isOwnMessage ? 'justify-end' : 'justify-start'} ${
+                    isOwnMessage ? 'animate-slide-in-right' : 'animate-slide-in-left'
+                  }`}
                 >
+                  {/* Avatar for other users */}
+                  {!isOwnMessage && (
+                    <div className="flex-shrink-0">
+                      {showAvatar ? (
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xs font-semibold shadow-md">
+                          {message.sender.name[0].toUpperCase()}
+                        </div>
+                      ) : (
+                        <div className="w-8" />
+                      )}
+                    </div>
+                  )}
+
+                  {/* Message bubble */}
                   <div
-                    className={`max-w-[70%] ${
+                    className={`max-w-[70%] group ${
                       isOwnMessage
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted text-foreground'
-                    } rounded-lg px-4 py-2`}
+                        ? 'bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/30'
+                        : 'bg-white border border-gray-200 text-foreground shadow-md'
+                    } rounded-2xl px-4 py-2.5 transition-smooth hover:shadow-xl ${
+                      isOwnMessage ? 'rounded-br-md' : 'rounded-bl-md'
+                    }`}
                   >
-                    {!isOwnMessage && (
-                      <p className="text-xs font-medium mb-1 opacity-70">
+                    {!isOwnMessage && showAvatar && (
+                      <p className="text-xs font-semibold mb-1.5 text-blue-600">
                         {message.sender.name}
                       </p>
                     )}
-                    <p className="text-sm break-words">{message.content}</p>
+                    <p className="text-sm leading-relaxed break-words">{message.content}</p>
                     <p
-                      className={`text-xs mt-1 ${
-                        isOwnMessage ? 'opacity-70' : 'text-muted-foreground'
+                      className={`text-xs mt-1.5 ${
+                        isOwnMessage ? 'text-white/70' : 'text-muted-foreground'
                       }`}
                     >
                       {formatTime(message.createdAt)}
                     </p>
                   </div>
+
+                  {/* Spacer for own messages */}
+                  {isOwnMessage && <div className="w-8" />}
                 </div>
               )
             })}

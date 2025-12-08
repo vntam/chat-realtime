@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, User, LogOut, Settings } from 'lucide-react'
+import { User, LogOut, Settings } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
+import NotificationDropdown from '@/components/notification/NotificationDropdown'
 
 export default function Header() {
   const navigate = useNavigate()
@@ -14,20 +15,19 @@ export default function Header() {
   }
 
   return (
-    <header className="h-16 bg-card border-b border-border px-6 flex items-center justify-between">
+    <header className="h-16 bg-white/80 backdrop-blur-xl border-b border-gray-200 px-6 flex items-center justify-between shadow-sm sticky top-0 z-30">
       {/* App Title */}
-      <div className="flex items-center gap-2">
-        <h1 className="text-xl font-bold">Chat Realtime</h1>
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30">
+          <span className="text-white font-bold text-lg">C</span>
+        </div>
+        <h1 className="text-xl font-bold gradient-text">Chat Realtime</h1>
       </div>
 
       {/* Right Actions */}
       <div className="flex items-center gap-4">
-        {/* Notification Bell */}
-        <button className="relative p-2 hover:bg-accent rounded-lg transition-colors">
-          <Bell className="w-5 h-5" />
-          {/* Badge - sẽ implement sau */}
-          <span className="absolute top-1 right-1 w-2 h-2 bg-destructive rounded-full"></span>
-        </button>
+        {/* Notification Dropdown */}
+        <NotificationDropdown />
 
         {/* User Menu */}
         <div className="relative">
