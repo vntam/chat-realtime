@@ -2,6 +2,31 @@
 node_modules/
 frontend/node_modules/
 
+# Chat backend build/output
+chat-backend/node_modules/
+chat-backend/dist/
+chat-backend/build/
+chat-backend/coverage/
+chat-backend/.nyc_output
+chat-backend/.turbo/
+chat-backend/.eslintcache
+chat-backend/.cache/
+chat-backend/.tmp
+chat-backend/.temp
+chat-backend/logs/
+chat-backend/*.log
+chat-backend/npm-debug.log*
+chat-backend/pnpm-debug.log*
+chat-backend/yarn-debug.log*
+chat-backend/yarn-error.log*
+
+# Chat backend environment files
+chat-backend/.env
+chat-backend/.env.local
+chat-backend/.env.development.local
+chat-backend/.env.test.local
+chat-backend/.env.production.local
+
 # Environment variables
 .env
 .env.local

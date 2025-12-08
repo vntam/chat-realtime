@@ -1,0 +1,1157 @@
+openapi: 3.0.3
+info:
+  title: Real-Time Chat System API
+  version: 2.0.0
+  description: |
+    REST API documentation for Chat Backend microservices.
+    
+    **Architecture:**
+    - **API Gateway** (port 3000): Reverse proxy for all services
+    - **User Service** (port 3001): Authentication, user management, roles
+    - **Chat Service** (port 3002): **WebSocket-only** for messaging + REST for file upload
+    - **Notification Service** (port 3003): Notifications via REST + WebSocket
+    
+    **Important Notes:**
+    - 🔌 **Chat messaging uses WebSocket ONLY** - See `/ws-docs` endpoint or `websocket_doc.md`
+    - 📁 **File upload uses REST API** - See `/upload` endpoints below
+    - 🔐 **JWT required** for most endpoints (except public auth endpoints)
+    - 🔄 **All requests go through API Gateway** in production
+    
+    **WebSocket Documentation:**
+    - Chat WebSocket: `GET http://localhost:3002/ws-docs` (custom JSON docs)
+    - Notification WebSocket: See `websocket_doc.md`
+servers:
+  - url: http://localhost:3000
+    description: API Gateway (Production - Recommended)
+  - url: http://localhost:3001
+    description: User Service (Direct - Dev only)
+  - url: http://localhost:3002
+    description: Chat Service (Direct - Dev only)
+  - url: http://localhost:3003
+    description: Notification Service (Direct - Dev only)
+
+security:
+  - BearerAuth: []
+
+tags:
+  - name: Authentication
+    description: User registration, login, token refresh (Public endpoints)
+  - name: User Management
+    description: User CRUD, search, profile (User Service)
+  - name: Role Management
+    description: Role CRUD, user-role assignment (User Service)
+  - name: File Upload
+    description: Upload/delete files for chat attachments (Chat Service - REST only)
+  - name: Notifications
+    description: Notification CRUD, broadcast (Notification Service - REST + WebSocket)
+  - name: WebSocket Documentation
+    description: Links to WebSocket event documentation
+
+paths:
+  # ==========================
+  # AUTHENTICATION
+  # ==========================
+  /auth/register:
+    post:
+      tags: [Authentication]
+      summary: Đăng ký tài khoản mới (public)
+      description: Cho phép user tự tạo tài khoản. Endpoint này **không cần JWT**.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRegisterRequest'
+      responses:
+        '201':
+          description: User được tạo thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Dữ liệu không hợp lệ hoặc user đã tồn tại
+
+  /auth/login:
+    post:
+      tags: [Authentication]
+      summary: Đăng nhập (public)
+      description: Trả về access token và refresh token.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Token trả về
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Thông tin đăng nhập không hợp lệ
+
+  /auth/refresh:
+    post:
+      tags: [Authentication]
+      summary: Làm mới access token
+      description: Dùng refresh token (gửi trong header `Authorization: Bearer <refreshToken>`) để lấy cặp token mới.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Token mới được cấp
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+
+  /auth/logout:
+    post:
+      tags: [Authentication]
+      summary: Đăng xuất và thu hồi refresh token
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Đăng xuất thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  msg:
+                    type: string
+                    example: Logout successfully
+
+  # ==========================
+  # USER SERVICE
+  # ==========================
+  /users:
+    get:
+      tags: [User Management]
+      summary: Search and list users (Public)
+      description: |
+        Search users with pagination, filtering and sorting.
+        - **Public endpoint** - No authentication required
+        - Backend searches both `username` AND `email` fields
+        - All query parameters are optional
+        - Returns paginated response with metadata
+      security: []
+      parameters:
+        - name: search
+          in: query
+          required: false
+          description: Từ khóa tìm kiếm (nhập username hoặc email đều được)
+          schema:
+            type: string
+            example: alice
+        - name: status
+          in: query
+          required: false
+          description: Lọc theo trạng thái
+          schema:
+            type: string
+            enum: [active, inactive, suspended]
+            example: active
+        - name: role
+          in: query
+          required: false
+          description: Lọc theo tên role
+          schema:
+            type: string
+            example: admin
+        - name: page
+          in: query
+          required: false
+          description: Số trang (bắt đầu từ 1)
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+            example: 1
+        - name: limit
+          in: query
+          required: false
+          description: Số lượng items mỗi trang
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+            example: 10
+        - name: sortBy
+          in: query
+          required: false
+          description: Trường để sắp xếp
+          schema:
+            type: string
+            enum: [username, email, created_at, status]
+            default: created_at
+            example: created_at
+        - name: sortOrder
+          in: query
+          required: false
+          description: Thứ tự sắp xếp
+          schema:
+            type: string
+            enum: [ASC, DESC]
+            default: DESC
+            example: DESC
+      responses:
+        '200':
+          description: Kết quả tìm kiếm với pagination
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedUserResponse'
+        '400':
+          description: Dữ liệu query không hợp lệ
+
+    post:
+      tags: [User Management]  
+      summary: Create new user (Admin only)
+      description: |
+        Create a new user account.
+        - **Requires JWT authentication**
+        - **Requires admin role**
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreateRequest'
+      responses:
+        '201':
+          description: User được tạo thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+  /users/me:
+    get:
+      tags: [User Management]
+      summary: Lấy thông tin đầy đủ của người dùng hiện tại từ JWT
+      description: |
+        Trả về thông tin đầy đủ của user hiện tại (dựa trên JWT token).
+        
+        **Khác biệt với GET /users/{id}:**
+        - `GET /users/me`: Trả về thông tin đầy đủ của chính mình (có email)
+        - `GET /users/{id}`: Chỉ trả về thông tin công khai (không có email, user_id, roles, groups)
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Thông tin đầy đủ của user hiện tại
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: Unauthorized - Token không hợp lệ
+
+  /users/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [User Management]
+      summary: Get public user info by ID (No auth required)
+      description: |
+        Trả về thông tin công khai của user (dùng khi user khác xem profile).
+        
+        **Lưu ý:** Để xem thông tin đầy đủ của chính mình (có email), dùng `GET /users/me`
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Thông tin user công khai (chỉ chứa dữ liệu an toàn)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicUser'
+        '404':
+          description: User không tồn tại
+
+    patch:
+      tags: [User Management]
+      summary: Update user information (Self only)
+      description: |
+        Chỉ cho phép user cập nhật thông tin của chính mình.
+        - User ID từ JWT token phải khớp với `id` trong path parameter.
+        - Nếu không khớp, trả về lỗi 403 Forbidden.
+      security:
+        - BearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdateRequest'
+      responses:
+        '200':
+          description: User được cập nhật
+        '403':
+          description: Không có quyền cập nhật user khác
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  statusCode:
+                    type: integer
+                    example: 403
+                  message:
+                    type: string
+                    example: 'Bạn chỉ có thể cập nhật thông tin của chính mình'
+                  error:
+                    type: string
+                    example: Forbidden
+
+    delete:
+      tags: [User Management]
+      summary: Delete user account (Self only)
+      description: |
+        Chỉ cho phép user xóa tài khoản của chính mình.
+        - User ID từ JWT token phải khớp với `id` trong path parameter.
+        - Nếu không khớp, trả về lỗi 403 Forbidden.
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Xóa thành công
+        '403':
+          description: Không có quyền xóa user khác
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  statusCode:
+                    type: integer
+                    example: 403
+                  message:
+                    type: string
+                    example: 'Bạn chỉ có thể xóa tài khoản của chính mình'
+                  error:
+                    type: string
+                    example: Forbidden
+
+  /users/{id}/roles:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      tags: [Role Management]
+      summary: Get user's roles
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Roles hiện tại
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/RoleAssignment' }
+    post:
+      tags: [Role Management]
+      summary: Assign role to user (Admin only)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRoleRequest'
+      responses:
+        '200':
+          description: Role được gán
+    delete:
+      tags: [Role Management]
+      summary: Remove role from user (Admin only)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: roleId
+          in: query
+          required: true
+          schema: { type: integer }
+      responses:
+        '204':
+          description: Đã gỡ role
+
+  /roles:
+    get:
+      tags: [Role Management]
+      summary: List all roles (Public)
+      description: |
+        Get list of roles with pagination, filtering and sorting.
+        - **Public endpoint** - No authentication required
+        - All query parameters are optional
+        - Returns paginated response with metadata
+      security: []
+      parameters:
+        - name: search
+          in: query
+          required: false
+          description: Từ khóa tìm kiếm (tên role)
+          schema:
+            type: string
+            example: admin
+        - name: page
+          in: query
+          required: false
+          description: Số trang (bắt đầu từ 1)
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+            example: 1
+        - name: limit
+          in: query
+          required: false
+          description: Số lượng items mỗi trang
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+            example: 20
+        - name: sortBy
+          in: query
+          required: false
+          description: Trường để sắp xếp
+          schema:
+            type: string
+            enum: [name, role_id]
+            default: name
+            example: name
+        - name: sortOrder
+          in: query
+          required: false
+          description: Thứ tự sắp xếp
+          schema:
+            type: string
+            enum: [ASC, DESC]
+            default: ASC
+            example: ASC
+      responses:
+        '200':
+          description: Danh sách role với pagination
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedRoleResponse'
+    post:
+      tags: [Role Management]
+      summary: Create new role (Admin only)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoleCreateRequest'
+      responses:
+        '201':
+          description: Role được tạo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+
+  /roles/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      tags: [Role Management]
+      summary: Get role details
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Role
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+    patch:
+      tags: [Role Management]
+      summary: Update role (Admin only)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoleUpdateRequest'
+      responses:
+        '200':
+          description: Role đã cập nhật
+    delete:
+      tags: [Role Management]
+      summary: Delete role (Admin only)
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Đã xóa
+
+  # ==========================
+  # FILE UPLOAD (Chat Service - REST only)
+  # ==========================
+  # Note: Chat messaging uses WebSocket ONLY
+  # See /ws-docs endpoint or websocket_doc.md for WebSocket events
+  
+  /upload/single:
+    post:
+      tags: [File Upload]
+      summary: Upload single file
+      description: |
+        Upload a single file (image, video, document) for chat attachments.
+        - Maximum file size: 10MB (configurable)
+        - Supported types: images, videos, documents, audio
+        - Returns URL for use in chat messages
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: File to upload
+                folder:
+                  type: string
+                  description: Optional folder path (default: attachments/{userId})
+      responses:
+        '201':
+          description: File uploaded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url:
+                    type: string
+                    description: Public URL of uploaded file
+                    example: https://storage.example.com/attachments/123/image.jpg
+                  fileType:
+                    type: string
+                    description: File category
+                    enum: [image, video, audio, document, other]
+                  fileName:
+                    type: string
+                    description: Original filename
+                  size:
+                    type: integer
+                    description: File size in bytes
+                  mimetype:
+                    type: string
+                    description: MIME type
+        '400':
+          description: No file provided or invalid file
+        '401':
+          description: Unauthorized
+
+  /upload/multiple:
+    post:
+      tags: [File Upload]
+      summary: Upload multiple files (max 10)
+      description: |
+        Upload multiple files at once.
+        - Maximum 10 files per request
+        - Each file max 10MB
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [files]
+              properties:
+                files:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  maxItems: 10
+                folder:
+                  type: string
+                  description: Optional folder path
+      responses:
+        '201':
+          description: Files uploaded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  files:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        url: { type: string }
+                        fileType: { type: string }
+                        fileName: { type: string }
+                        size: { type: integer }
+                        mimetype: { type: string }
+        '400':
+          description: No files provided
+        '401':
+          description: Unauthorized
+
+  /upload:
+    delete:
+      tags: [File Upload]
+      summary: Delete uploaded file
+      description: Delete a previously uploaded file from storage.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fileUrl]
+              properties:
+                fileUrl:
+                  type: string
+                  description: URL of file to delete
+                  example: https://storage.example.com/attachments/123/image.jpg
+      responses:
+        '200':
+          description: File deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: File deleted successfully
+        '400':
+          description: File URL is required
+        '401':
+          description: Unauthorized
+
+  # ==========================
+  # WEBSOCKET DOCUMENTATION
+  # ==========================
+  /ws-docs:
+    get:
+      tags: [WebSocket Documentation]
+      summary: Get Chat WebSocket events documentation (JSON)
+      description: |
+        Returns JSON documentation for all WebSocket events in Chat Service.
+        - **Chat WebSocket namespace:** `ws://localhost:3002/chat`
+        - **Via Gateway:** `ws://localhost:3000/chat` (production)
+        - See `websocket_doc.md` for detailed guide
+      security: []
+      responses:
+        '200':
+          description: WebSocket events documentation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  service:
+                    type: string
+                    example: Chat Service
+                  namespace:
+                    type: string
+                    example: /chat
+                  events:
+                    type: object
+                    description: Client-to-server and server-to-client events
+
+  # ==========================
+  # NOTIFICATION SERVICE
+  # ==========================
+  /notifications:
+
+    get:
+      tags: [Notifications]
+      summary: Get user's notifications
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: unreadOnly
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: Chỉ lấy thông báo chưa đọc nếu true
+      responses:
+        '200':
+          description: Danh sách thông báo
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Notification' }
+        '401':
+          description: Unauthorized
+
+    post:
+      tags: [Notifications]
+      summary: Create notification (Admin or system only)
+      description: Chỉ admin hoặc hệ thống mới có quyền tạo thông báo.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationCreateRequest'
+      responses:
+        '201':
+          description: Tạo thông báo thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+        '400':
+          description: Dữ liệu không hợp lệ
+        '403':
+          description: Chỉ admin hoặc hệ thống mới có quyền tạo thông báo
+        '401':
+          description: Unauthorized
+
+  /notifications/broadcast:
+    post:
+      tags: [Notifications]
+      summary: Send broadcast notification (Admin only)
+      description: Gửi thông báo đến tất cả người dùng trong hệ thống. Chỉ admin mới có quyền.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, body]
+              properties:
+                title:
+                  type: string
+                  description: Tiêu đề thông báo
+                body:
+                  type: string
+                  description: Nội dung thông báo
+      responses:
+        '200':
+          description: Thông báo đã được gửi đến tất cả người dùng
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Broadcast notification sent successfully
+        '400':
+          description: Dữ liệu không hợp lệ
+        '403':
+          description: Chỉ admin mới có quyền gửi broadcast
+        '401':
+          description: Unauthorized
+
+  /notifications/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Notifications]
+      summary: Get notification details
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Chi tiết thông báo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+        '404':
+          description: Thông báo không tồn tại
+        '403':
+          description: Không có quyền xem thông báo này
+        '401':
+          description: Unauthorized
+
+    delete:
+      tags: [Notifications]
+      summary: Delete notification (Self only)
+      description: User chỉ có thể xóa thông báo của chính mình.
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Thông báo đã được xóa
+        '403':
+          description: Không có quyền xóa thông báo này
+        '404':
+          description: Thông báo không tồn tại
+        '401':
+          description: Unauthorized
+
+  /notifications/{id}/read:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      tags: [Notifications]
+      summary: Mark notification as read
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Thông báo đã được đánh dấu đã đọc
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+        '404':
+          description: Thông báo không tồn tại
+        '403':
+          description: Không có quyền đánh dấu thông báo này
+        '401':
+          description: Unauthorized
+
+  /notifications/unread/count:
+    get:
+      tags: [Notifications]
+      summary: Get unread notification count
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Số lượng thông báo chưa đọc
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                    description: Tổng số thông báo chưa đọc
+        '401':
+          description: Unauthorized
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    User:
+      type: object
+      description: |
+        Thông tin đầy đủ của user (dùng cho GET /users/me - thông tin của chính mình).
+        Chứa: username, email, avatar_url, status, created_at
+        KHÔNG chứa: user_id, roles, groups (thông tin nhạy cảm)
+      properties:
+        username: { type: string }
+        email: { type: string }
+        avatar_url: { type: string, nullable: true }
+        status: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+
+    PublicUser:
+      type: object
+      description: |
+        Thông tin công khai của user (dùng cho GET /users/{id} - khi user khác xem profile).
+        Chứa: username, avatar_url, status, created_at
+        KHÔNG chứa: user_id, email, roles, groups (thông tin nhạy cảm)
+      properties:
+        username:
+          type: string
+          description: Tên đăng nhập (công khai)
+        avatar_url:
+          type: string
+          description: URL avatar (công khai)
+          nullable: true
+        status:
+          type: string
+          description: Trạng thái tài khoản (công khai)
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          description: Ngày tạo tài khoản
+          nullable: true
+
+    UserRegisterRequest:
+      type: object
+      required: [username, password, confirmPassword, email]
+      properties:
+        username: { type: string }
+        password:
+          type: string
+          format: password
+          minLength: 6
+        confirmPassword:
+          type: string
+          format: password
+        email: { type: string, format: email }
+        fullName: { type: string }
+        avatar_url: { type: string }
+        status:
+          type: string
+          enum: [active, inactive, suspended]
+
+    UserCreateRequest:
+      type: object
+      required: [username, password, email]
+      properties:
+        username: { type: string }
+        password:
+          type: string
+          minLength: 6
+        email: { type: string, format: email }
+        avatar_url: { type: string }
+        status: { type: string }
+
+    UserUpdateRequest:
+      type: object
+      properties:
+        username: { type: string }
+        email: { type: string, format: email }
+        avatar_url: { type: string }
+        status: { type: string }
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string }
+
+    AuthResponse:
+      type: object
+      properties:
+        msg: { type: string }
+        accessToken: { type: string }
+        refreshToken: { type: string }
+
+    Role:
+      type: object
+      properties:
+        role_id: { type: integer }
+        name: { type: string }
+        description: { type: string }
+
+    RoleCreateRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        description: { type: string }
+
+    RoleUpdateRequest:
+      type: object
+      properties:
+        name: { type: string }
+        description: { type: string }
+
+    RoleAssignment:
+      type: object
+      properties:
+        user_id: { type: integer }
+        role_id: { type: integer }
+        assigned_at: { type: string, format: date-time }
+        role:
+          $ref: '#/components/schemas/Role'
+
+    UserRoleRequest:
+      type: object
+      required: [roleId]
+      properties:
+        roleId: { type: integer }
+
+    Conversation:
+      type: object
+      properties:
+        _id: { type: string }
+        type: { type: string, enum: [private, group] }
+        participants:
+          type: array
+          items: { type: integer }
+        name:
+          type: string
+          description: Tên nhóm (chỉ cho group chat)
+          nullable: true
+        avatar:
+          type: string
+          description: URL avatar nhóm (chỉ cho group chat)
+          nullable: true
+        admin_id:
+          type: integer
+          description: ID admin nhóm (chỉ cho group chat)
+          nullable: true
+        moderator_ids:
+          type: array
+          items: { type: integer }
+          description: Danh sách ID moderators (chỉ cho group chat)
+          nullable: true
+        status:
+          type: string
+          enum: [pending, accepted, declined]
+          description: Status của conversation (pending=chờ accept message request)
+        initiator_id:
+          type: integer
+          description: ID người tạo message request
+        created_at: { type: string, format: date-time }
+
+    ConversationCreateRequest:
+      type: object
+      required: [type, participants]
+      properties:
+        type:
+          type: string
+          enum: [private, group]
+        participants:
+          type: array
+          items: { type: integer }
+        name:
+          type: string
+          description: Tên nhóm (bắt buộc nếu type='group')
+        avatar:
+          type: string
+          description: URL avatar nhóm (tùy chọn)
+
+    Message:
+      type: object
+      properties:
+        _id: { type: string }
+        sender_id: { type: integer }
+        content: { type: string }
+        attachments:
+          type: array
+          items: { type: string }
+        seen_by:
+          type: array
+          items: { type: integer }
+        created_at: { type: string, format: date-time }
+
+    MessageSendRequest:
+      type: object
+      required: [content]
+      properties:
+        content: { type: string }
+        attachments:
+          type: array
+          items: { type: string }
+
+    Notification:
+      type: object
+      properties:
+        _id: { type: string }
+        user_id: { type: integer }
+        type:
+          type: string
+          enum: [message, group_invite, system]
+        title: { type: string }
+        content: { type: string }
+        is_read: { type: boolean }
+        related_id: { type: string }
+        created_at: { type: string, format: date-time }
+
+    NotificationCreateRequest:
+      type: object
+      required: [user_id, type, title, content]
+      properties:
+        user_id: { type: integer }
+        type:
+          type: string
+          enum: [message, group_invite, system]
+        title: { type: string }
+        content: { type: string }
+        related_id: { type: string, nullable: true }
+
+    PaginatedUserResponse:
+      type: object
+      description: |
+        Response cho GET /users - Danh sách users công khai với pagination.
+        Mỗi user trong data chỉ chứa thông tin công khai (PublicUser).
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/PublicUser' }
+        total:
+          type: integer
+          description: Tổng số users
+          example: 100
+        page:
+          type: integer
+          description: Trang hiện tại
+          example: 1
+        limit:
+          type: integer
+          description: Số items mỗi trang
+          example: 10
+        totalPages:
+          type: integer
+          description: Tổng số trang
+          example: 10
+
+    PaginatedRoleResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Role' }
+        total:
+          type: integer
+          description: Tổng số roles
+          example: 50
+        page:
+          type: integer
+          description: Trang hiện tại
+          example: 1
+        limit:
+          type: integer
+          description: Số items mỗi trang
+          example: 20
+        totalPages:
+          type: integer
+          description: Tổng số trang
+          example: 3

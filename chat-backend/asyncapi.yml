@@ -1,0 +1,1201 @@
+asyncapi: 2.6.0
+info:
+  title: Chat Service WebSocket API
+  version: 2.0.0
+  description: |
+    WebSocket API for real-time chat messaging.
+    
+    **Features:**
+    - Real-time messaging with delivery receipts
+    - Typing indicators
+    - Conversation management (private & group chat)
+    - Message search & pagination
+    - Message request system (accept/decline)
+    - Member management for group chats
+    
+    **Connection:**
+    - **Namespace:** `/chat`
+    - **Direct (Dev):** `ws://localhost:3002/chat`
+    - **Via Gateway (Prod):** `ws://localhost:3000/chat`
+    
+    **Authentication:**
+    - Socket.IO `auth` object with JWT token
+    - Example: `io('ws://localhost:3002/chat', { auth: { token: 'Bearer xxx' } })`
+    
+    **Acknowledgment Pattern:**
+    All client→server events use Socket.IO callbacks with this shape:
+    ```json
+    {
+      "ok": true,
+      "data": { ... },
+      "error": { "code": "ERROR_CODE", "message": "Error description" }
+    }
+    ```
+  contact:
+    name: Chat Backend Team
+    email: support@chatapp.com
+  license:
+    name: MIT
+
+servers:
+  production:
+    url: ws://localhost:3000/chat
+    protocol: ws
+    description: Production server via API Gateway
+  development:
+    url: ws://localhost:3002/chat
+    protocol: ws
+    description: Development server (direct connection)
+
+defaultContentType: application/json
+
+channels:
+  # ==========================
+  # CONVERSATION MANAGEMENT
+  # ==========================
+  
+  conversation/join:
+    description: Join a conversation room to receive live events (messages, typing, etc.)
+    subscribe:
+      operationId: joinConversation
+      summary: Join conversation room
+      message:
+        $ref: '#/components/messages/ConversationJoinRequest'
+    publish:
+      operationId: joinConversationAck
+      summary: Join confirmation
+      message:
+        $ref: '#/components/messages/AckResponse'
+
+  conversation/leave:
+    description: Leave a conversation room (stop receiving events)
+    subscribe:
+      operationId: leaveConversation
+      summary: Leave conversation room
+      message:
+        $ref: '#/components/messages/ConversationLeaveRequest'
+    publish:
+      operationId: leaveConversationAck
+      summary: Leave confirmation
+      message:
+        $ref: '#/components/messages/AckResponse'
+
+  conversation/list:
+    description: Get list of conversations for authenticated user
+    subscribe:
+      operationId: listConversations
+      summary: List user's conversations
+      message:
+        $ref: '#/components/messages/ConversationListRequest'
+    publish:
+      operationId: listConversationsResponse
+      summary: Conversation list response
+      message:
+        $ref: '#/components/messages/ConversationListResponse'
+
+  conversation/get:
+    description: Get conversation details (must be a participant)
+    subscribe:
+      operationId: getConversation
+      summary: Get conversation detail
+      message:
+        $ref: '#/components/messages/ConversationGetRequest'
+    publish:
+      operationId: getConversationResponse
+      summary: Conversation detail response
+      message:
+        $ref: '#/components/messages/ConversationGetResponse'
+
+  conversation/create:
+    description: Create new conversation (private or group chat)
+    subscribe:
+      operationId: createConversation
+      summary: Create conversation
+      message:
+        $ref: '#/components/messages/ConversationCreateRequest'
+    publish:
+      operationId: createConversationResponse
+      summary: Created conversation response
+      message:
+        $ref: '#/components/messages/ConversationCreateResponse'
+
+  conversation/delete:
+    description: Delete conversation (admin/owner only)
+    subscribe:
+      operationId: deleteConversation
+      summary: Delete conversation
+      message:
+        $ref: '#/components/messages/ConversationDeleteRequest'
+    publish:
+      operationId: deleteConversationAck
+      summary: Delete confirmation
+      message:
+        $ref: '#/components/messages/AckResponse'
+
+  conversation/members:
+    description: Get list of members in a conversation
+    subscribe:
+      operationId: getConversationMembers
+      summary: Get conversation members
+      message:
+        $ref: '#/components/messages/ConversationMembersRequest'
+    publish:
+      operationId: getConversationMembersResponse
+      summary: Members list response
+      message:
+        $ref: '#/components/messages/ConversationMembersResponse'
+
+  conversation/add-member:
+    description: Add member to group chat (admin/moderator only)
+    subscribe:
+      operationId: addMember
+      summary: Add member to conversation
+      message:
+        $ref: '#/components/messages/ConversationAddMemberRequest'
+    publish:
+      operationId: addMemberAck
+      summary: Add member confirmation
+      message:
+        $ref: '#/components/messages/AckResponse'
+
+  conversation/remove-member:
+    description: Remove member from group chat (admin/moderator only)
+    subscribe:
+      operationId: removeMember
+      summary: Remove member from conversation
+      message:
+        $ref: '#/components/messages/ConversationRemoveMemberRequest'
+    publish:
+      operationId: removeMemberAck
+      summary: Remove member confirmation
+      message:
+        $ref: '#/components/messages/AckResponse'
+
+  conversation/mark-read:
+    description: Mark all messages in conversation as read
+    subscribe:
+      operationId: markConversationRead
+      summary: Mark conversation as read
+      message:
+        $ref: '#/components/messages/ConversationMarkReadRequest'
+    publish:
+      operationId: markConversationReadAck
+      summary: Mark read confirmation
+      message:
+        $ref: '#/components/messages/AckResponse'
+
+  conversation/accept:
+    description: Accept message/conversation request
+    subscribe:
+      operationId: acceptRequest
+      summary: Accept conversation request
+      message:
+        $ref: '#/components/messages/ConversationAcceptRequest'
+    publish:
+      operationId: acceptRequestAck
+      summary: Accept confirmation
+      message:
+        $ref: '#/components/messages/AckResponse'
+
+  conversation/decline:
+    description: Decline message/conversation request
+    subscribe:
+      operationId: declineRequest
+      summary: Decline conversation request
+      message:
+        $ref: '#/components/messages/ConversationDeclineRequest'
+    publish:
+      operationId: declineRequestAck
+      summary: Decline confirmation
+      message:
+        $ref: '#/components/messages/AckResponse'
+
+  # ==========================
+  # MESSAGING
+  # ==========================
+
+  message/send:
+    description: Send message to a conversation
+    subscribe:
+      operationId: sendMessage
+      summary: Send message
+      message:
+        $ref: '#/components/messages/MessageSendRequest'
+    publish:
+      operationId: sendMessageResponse
+      summary: Sent message response
+      message:
+        $ref: '#/components/messages/MessageSendResponse'
+
+  message/edit:
+    description: Edit previously sent message (sender only)
+    subscribe:
+      operationId: editMessage
+      summary: Edit message
+      message:
+        $ref: '#/components/messages/MessageEditRequest'
+    publish:
+      operationId: editMessageResponse
+      summary: Edited message response
+      message:
+        $ref: '#/components/messages/MessageEditResponse'
+
+  message/delete:
+    description: Delete message (sender only)
+    subscribe:
+      operationId: deleteMessage
+      summary: Delete message
+      message:
+        $ref: '#/components/messages/MessageDeleteRequest'
+    publish:
+      operationId: deleteMessageAck
+      summary: Delete confirmation
+      message:
+        $ref: '#/components/messages/AckResponse'
+
+  message/list:
+    description: Get messages in conversation with pagination
+    subscribe:
+      operationId: listMessages
+      summary: List messages
+      message:
+        $ref: '#/components/messages/MessageListRequest'
+    publish:
+      operationId: listMessagesResponse
+      summary: Messages list response
+      message:
+        $ref: '#/components/messages/MessageListResponse'
+
+  message/search:
+    description: Full-text search messages
+    subscribe:
+      operationId: searchMessages
+      summary: Search messages
+      message:
+        $ref: '#/components/messages/MessageSearchRequest'
+    publish:
+      operationId: searchMessagesResponse
+      summary: Search results response
+      message:
+        $ref: '#/components/messages/MessageSearchResponse'
+
+  message/read:
+    description: Mark single message as read
+    subscribe:
+      operationId: markMessageRead
+      summary: Mark message as read
+      message:
+        $ref: '#/components/messages/MessageReadRequest'
+    publish:
+      operationId: markMessageReadAck
+      summary: Mark read confirmation
+      message:
+        $ref: '#/components/messages/AckResponse'
+
+  message/delivered:
+    description: Mark message as delivered to this client
+    subscribe:
+      operationId: markMessageDelivered
+      summary: Mark message as delivered
+      message:
+        $ref: '#/components/messages/MessageDeliveredRequest'
+    publish:
+      operationId: markMessageDeliveredAck
+      summary: Mark delivered confirmation
+      message:
+        $ref: '#/components/messages/AckResponse'
+
+  messages/mark-read:
+    description: Mark multiple messages as read (bulk operation)
+    subscribe:
+      operationId: markMessagesRead
+      summary: Mark multiple messages as read
+      message:
+        $ref: '#/components/messages/MessagesMarkReadRequest'
+    publish:
+      operationId: markMessagesReadAck
+      summary: Bulk mark read confirmation
+      message:
+        $ref: '#/components/messages/AckResponse'
+
+  message/status/update:
+    description: Update message delivery status (delivered/read/failed)
+    subscribe:
+      operationId: updateMessageStatus
+      summary: Update message status
+      message:
+        $ref: '#/components/messages/MessageStatusUpdateRequest'
+    publish:
+      operationId: updateMessageStatusAck
+      summary: Status update confirmation
+      message:
+        $ref: '#/components/messages/AckResponse'
+
+  message/status/get:
+    description: Get delivery status for a message
+    subscribe:
+      operationId: getMessageStatus
+      summary: Get message status
+      message:
+        $ref: '#/components/messages/MessageStatusGetRequest'
+    publish:
+      operationId: getMessageStatusResponse
+      summary: Message status response
+      message:
+        $ref: '#/components/messages/MessageStatusGetResponse'
+
+  message/unread-count:
+    description: Get total unread messages count for current user
+    subscribe:
+      operationId: getUnreadCount
+      summary: Get unread count
+      message:
+        $ref: '#/components/messages/MessageUnreadCountRequest'
+    publish:
+      operationId: getUnreadCountResponse
+      summary: Unread count response
+      message:
+        $ref: '#/components/messages/MessageUnreadCountResponse'
+
+  # ==========================
+  # TYPING INDICATOR
+  # ==========================
+
+  typing:
+    description: Send/receive typing indicators
+    subscribe:
+      operationId: sendTypingIndicator
+      summary: Send typing indicator
+      message:
+        $ref: '#/components/messages/TypingRequest'
+    publish:
+      operationId: receiveTypingIndicator
+      summary: Receive typing indicator
+      message:
+        $ref: '#/components/messages/TypingBroadcast'
+
+  # ==========================
+  # SERVER BROADCASTS (Receive-only)
+  # ==========================
+
+  conversation/created:
+    description: Broadcast when conversation is created (you are a participant)
+    publish:
+      operationId: conversationCreatedEvent
+      summary: Conversation created event
+      message:
+        $ref: '#/components/messages/ConversationCreatedEvent'
+
+  conversation/deleted:
+    description: Broadcast when conversation is deleted or you are removed
+    publish:
+      operationId: conversationDeletedEvent
+      summary: Conversation deleted event
+      message:
+        $ref: '#/components/messages/ConversationDeletedEvent'
+
+  conversation/member-added:
+    description: Broadcast when member is added to conversation
+    publish:
+      operationId: memberAddedEvent
+      summary: Member added event
+      message:
+        $ref: '#/components/messages/MemberAddedEvent'
+
+  conversation/member-removed:
+    description: Broadcast when member is removed from conversation
+    publish:
+      operationId: memberRemovedEvent
+      summary: Member removed event
+      message:
+        $ref: '#/components/messages/MemberRemovedEvent'
+
+  conversation/invited:
+    description: Broadcast when you are invited to a conversation
+    publish:
+      operationId: conversationInvitedEvent
+      summary: Conversation invitation event
+      message:
+        $ref: '#/components/messages/ConversationInvitedEvent'
+
+  conversation/read:
+    description: Broadcast when all messages in conversation marked read by a user
+    publish:
+      operationId: conversationReadEvent
+      summary: Conversation read event
+      message:
+        $ref: '#/components/messages/ConversationReadEvent'
+
+  request/accepted:
+    description: Broadcast when your conversation request is accepted
+    publish:
+      operationId: requestAcceptedEvent
+      summary: Request accepted event
+      message:
+        $ref: '#/components/messages/RequestAcceptedEvent'
+
+  request/declined:
+    description: Broadcast when your conversation request is declined
+    publish:
+      operationId: requestDeclinedEvent
+      summary: Request declined event
+      message:
+        $ref: '#/components/messages/RequestDeclinedEvent'
+
+  message/created:
+    description: Broadcast new message to conversation room
+    publish:
+      operationId: messageCreatedEvent
+      summary: Message created event
+      message:
+        $ref: '#/components/messages/MessageCreatedEvent'
+
+  message/updated:
+    description: Broadcast when message content is edited
+    publish:
+      operationId: messageUpdatedEvent
+      summary: Message updated event
+      message:
+        $ref: '#/components/messages/MessageUpdatedEvent'
+
+  message/deleted:
+    description: Broadcast when message is deleted
+    publish:
+      operationId: messageDeletedEvent
+      summary: Message deleted event
+      message:
+        $ref: '#/components/messages/MessageDeletedEvent'
+
+  message/status:
+    description: Broadcast delivery/read status change for a message
+    publish:
+      operationId: messageStatusEvent
+      summary: Message status changed event
+      message:
+        $ref: '#/components/messages/MessageStatusEvent'
+
+components:
+  messages:
+    # ==========================
+    # COMMON RESPONSES
+    # ==========================
+    
+    AckResponse:
+      name: AckResponse
+      title: Acknowledgment Response
+      summary: Standard acknowledgment with ok/data/error
+      payload:
+        type: object
+        properties:
+          ok:
+            type: boolean
+            description: Success status
+          data:
+            type: object
+            description: Response data (varies by operation)
+          error:
+            type: object
+            properties:
+              code:
+                type: string
+                enum: [FORBIDDEN, NOT_FOUND, UNAUTHORIZED, INVALID_INPUT, SERVER_ERROR]
+              message:
+                type: string
+        examples:
+          - ok: true
+            data: {}
+          - ok: false
+            error:
+              code: FORBIDDEN
+              message: Not authorized to perform this action
+
+    # ==========================
+    # CONVERSATION MESSAGES
+    # ==========================
+
+    ConversationJoinRequest:
+      name: ConversationJoinRequest
+      payload:
+        type: object
+        required: [conversationId]
+        properties:
+          conversationId:
+            type: string
+            description: MongoDB ObjectId of conversation
+        examples:
+          - conversationId: "6578a1b2c3d4e5f678901234"
+
+    ConversationLeaveRequest:
+      name: ConversationLeaveRequest
+      payload:
+        type: object
+        required: [conversationId]
+        properties:
+          conversationId:
+            type: string
+        examples:
+          - conversationId: "6578a1b2c3d4e5f678901234"
+
+    ConversationListRequest:
+      name: ConversationListRequest
+      payload:
+        type: object
+        properties:
+          limit:
+            type: integer
+            default: 20
+            description: Max conversations to return
+          skip:
+            type: integer
+            default: 0
+            description: Number of conversations to skip
+        examples:
+          - limit: 20
+            skip: 0
+
+    ConversationListResponse:
+      name: ConversationListResponse
+      payload:
+        type: object
+        properties:
+          ok:
+            type: boolean
+          data:
+            type: object
+            properties:
+              conversations:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Conversation'
+
+    ConversationGetRequest:
+      name: ConversationGetRequest
+      payload:
+        type: object
+        required: [conversationId]
+        properties:
+          conversationId:
+            type: string
+        examples:
+          - conversationId: "6578a1b2c3d4e5f678901234"
+
+    ConversationGetResponse:
+      name: ConversationGetResponse
+      payload:
+        type: object
+        properties:
+          ok:
+            type: boolean
+          data:
+            type: object
+            properties:
+              conversation:
+                $ref: '#/components/schemas/Conversation'
+
+    ConversationCreateRequest:
+      name: ConversationCreateRequest
+      payload:
+        type: object
+        required: [participantIds]
+        properties:
+          name:
+            type: string
+            description: Group name (required for group chats)
+          participantIds:
+            type: array
+            items:
+              type: integer
+            description: User IDs to add to conversation
+        examples:
+          - name: "Project Team"
+            participantIds: [2, 3, 4]
+
+    ConversationCreateResponse:
+      name: ConversationCreateResponse
+      payload:
+        type: object
+        properties:
+          ok:
+            type: boolean
+          data:
+            type: object
+            properties:
+              conversation:
+                $ref: '#/components/schemas/Conversation'
+
+    ConversationDeleteRequest:
+      name: ConversationDeleteRequest
+      payload:
+        type: object
+        required: [conversationId]
+        properties:
+          conversationId:
+            type: string
+
+    ConversationMembersRequest:
+      name: ConversationMembersRequest
+      payload:
+        type: object
+        required: [conversationId]
+        properties:
+          conversationId:
+            type: string
+
+    ConversationMembersResponse:
+      name: ConversationMembersResponse
+      payload:
+        type: object
+        properties:
+          ok:
+            type: boolean
+          data:
+            type: object
+            properties:
+              members:
+                type: array
+                items:
+                  type: integer
+
+    ConversationAddMemberRequest:
+      name: ConversationAddMemberRequest
+      payload:
+        type: object
+        required: [conversationId, userId]
+        properties:
+          conversationId:
+            type: string
+          userId:
+            type: integer
+
+    ConversationRemoveMemberRequest:
+      name: ConversationRemoveMemberRequest
+      payload:
+        type: object
+        required: [conversationId, userId]
+        properties:
+          conversationId:
+            type: string
+          userId:
+            type: integer
+
+    ConversationMarkReadRequest:
+      name: ConversationMarkReadRequest
+      payload:
+        type: object
+        required: [conversationId]
+        properties:
+          conversationId:
+            type: string
+
+    ConversationAcceptRequest:
+      name: ConversationAcceptRequest
+      payload:
+        type: object
+        required: [conversationId]
+        properties:
+          conversationId:
+            type: string
+
+    ConversationDeclineRequest:
+      name: ConversationDeclineRequest
+      payload:
+        type: object
+        required: [conversationId]
+        properties:
+          conversationId:
+            type: string
+
+    # ==========================
+    # MESSAGE MESSAGES
+    # ==========================
+
+    MessageSendRequest:
+      name: MessageSendRequest
+      payload:
+        type: object
+        required: [conversationId, content]
+        properties:
+          conversationId:
+            type: string
+          content:
+            type: string
+          attachments:
+            type: array
+            items:
+              type: string
+            description: Array of file URLs
+          clientId:
+            type: string
+            description: Client-generated UUID for deduplication
+        examples:
+          - conversationId: "6578a1b2c3d4e5f678901234"
+            content: "Hello team!"
+            attachments: ["https://storage.example.com/file.jpg"]
+            clientId: "uuid-12345"
+
+    MessageSendResponse:
+      name: MessageSendResponse
+      payload:
+        type: object
+        properties:
+          ok:
+            type: boolean
+          data:
+            type: object
+            properties:
+              message:
+                $ref: '#/components/schemas/Message'
+
+    MessageEditRequest:
+      name: MessageEditRequest
+      payload:
+        type: object
+        required: [messageId, content]
+        properties:
+          messageId:
+            type: string
+          content:
+            type: string
+
+    MessageEditResponse:
+      name: MessageEditResponse
+      payload:
+        type: object
+        properties:
+          ok:
+            type: boolean
+          data:
+            type: object
+            properties:
+              message:
+                $ref: '#/components/schemas/Message'
+
+    MessageDeleteRequest:
+      name: MessageDeleteRequest
+      payload:
+        type: object
+        required: [messageId]
+        properties:
+          messageId:
+            type: string
+
+    MessageListRequest:
+      name: MessageListRequest
+      payload:
+        type: object
+        required: [conversationId]
+        properties:
+          conversationId:
+            type: string
+          limit:
+            type: integer
+            default: 20
+          before:
+            type: string
+            format: date-time
+            description: Get messages before this timestamp
+
+    MessageListResponse:
+      name: MessageListResponse
+      payload:
+        type: object
+        properties:
+          ok:
+            type: boolean
+          data:
+            type: object
+            properties:
+              messages:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Message'
+
+    MessageSearchRequest:
+      name: MessageSearchRequest
+      payload:
+        type: object
+        required: [query]
+        properties:
+          query:
+            type: string
+            description: Search keyword
+          conversationId:
+            type: string
+            description: Optional conversation filter
+          senderId:
+            type: integer
+            description: Optional sender filter
+          limit:
+            type: integer
+            default: 20
+          skip:
+            type: integer
+            default: 0
+
+    MessageSearchResponse:
+      name: MessageSearchResponse
+      payload:
+        type: object
+        properties:
+          ok:
+            type: boolean
+          data:
+            type: object
+            properties:
+              messages:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Message'
+              total:
+                type: integer
+
+    MessageReadRequest:
+      name: MessageReadRequest
+      payload:
+        type: object
+        required: [messageId]
+        properties:
+          messageId:
+            type: string
+
+    MessageDeliveredRequest:
+      name: MessageDeliveredRequest
+      payload:
+        type: object
+        required: [messageId]
+        properties:
+          messageId:
+            type: string
+
+    MessagesMarkReadRequest:
+      name: MessagesMarkReadRequest
+      payload:
+        type: object
+        required: [messageIds]
+        properties:
+          messageIds:
+            type: array
+            items:
+              type: string
+
+    MessageStatusUpdateRequest:
+      name: MessageStatusUpdateRequest
+      payload:
+        type: object
+        required: [messageId, status]
+        properties:
+          messageId:
+            type: string
+          status:
+            type: string
+            enum: [sent, delivered, read, failed]
+
+    MessageStatusGetRequest:
+      name: MessageStatusGetRequest
+      payload:
+        type: object
+        required: [messageId]
+        properties:
+          messageId:
+            type: string
+
+    MessageStatusGetResponse:
+      name: MessageStatusGetResponse
+      payload:
+        type: object
+        properties:
+          ok:
+            type: boolean
+          data:
+            type: object
+            properties:
+              status:
+                type: object
+                properties:
+                  messageId:
+                    type: string
+                  status:
+                    type: string
+                  deliveryInfo:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        user_id:
+                          type: integer
+                        status:
+                          type: string
+                        timestamp:
+                          type: string
+                          format: date-time
+
+    MessageUnreadCountRequest:
+      name: MessageUnreadCountRequest
+      payload:
+        type: object
+        description: Empty payload
+
+    MessageUnreadCountResponse:
+      name: MessageUnreadCountResponse
+      payload:
+        type: object
+        properties:
+          ok:
+            type: boolean
+          data:
+            type: object
+            properties:
+              count:
+                type: integer
+
+    # ==========================
+    # TYPING INDICATOR
+    # ==========================
+
+    TypingRequest:
+      name: TypingRequest
+      payload:
+        type: object
+        required: [conversationId, isTyping]
+        properties:
+          conversationId:
+            type: string
+          isTyping:
+            type: boolean
+
+    TypingBroadcast:
+      name: TypingBroadcast
+      payload:
+        type: object
+        properties:
+          conversationId:
+            type: string
+          userId:
+            type: integer
+          isTyping:
+            type: boolean
+
+    # ==========================
+    # SERVER EVENTS
+    # ==========================
+
+    ConversationCreatedEvent:
+      name: ConversationCreatedEvent
+      payload:
+        type: object
+        properties:
+          conversationId:
+            type: string
+          conversation:
+            $ref: '#/components/schemas/Conversation'
+
+    ConversationDeletedEvent:
+      name: ConversationDeletedEvent
+      payload:
+        type: object
+        properties:
+          conversationId:
+            type: string
+
+    MemberAddedEvent:
+      name: MemberAddedEvent
+      payload:
+        type: object
+        properties:
+          conversationId:
+            type: string
+          userId:
+            type: integer
+
+    MemberRemovedEvent:
+      name: MemberRemovedEvent
+      payload:
+        type: object
+        properties:
+          conversationId:
+            type: string
+          userId:
+            type: integer
+
+    ConversationInvitedEvent:
+      name: ConversationInvitedEvent
+      payload:
+        type: object
+        properties:
+          conversationId:
+            type: string
+
+    ConversationReadEvent:
+      name: ConversationReadEvent
+      payload:
+        type: object
+        properties:
+          conversationId:
+            type: string
+          userId:
+            type: integer
+          timestamp:
+            type: string
+            format: date-time
+
+    RequestAcceptedEvent:
+      name: RequestAcceptedEvent
+      payload:
+        type: object
+        properties:
+          conversationId:
+            type: string
+          acceptedBy:
+            type: integer
+
+    RequestDeclinedEvent:
+      name: RequestDeclinedEvent
+      payload:
+        type: object
+        properties:
+          conversationId:
+            type: string
+          declinedBy:
+            type: integer
+
+    MessageCreatedEvent:
+      name: MessageCreatedEvent
+      payload:
+        $ref: '#/components/schemas/Message'
+
+    MessageUpdatedEvent:
+      name: MessageUpdatedEvent
+      payload:
+        $ref: '#/components/schemas/Message'
+
+    MessageDeletedEvent:
+      name: MessageDeletedEvent
+      payload:
+        type: object
+        properties:
+          messageId:
+            type: string
+
+    MessageStatusEvent:
+      name: MessageStatusEvent
+      payload:
+        type: object
+        properties:
+          messageId:
+            type: string
+          userId:
+            type: integer
+          status:
+            type: string
+            enum: [sent, delivered, read, failed]
+          timestamp:
+            type: string
+            format: date-time
+          deliveryInfo:
+            type: array
+            items:
+              type: object
+              properties:
+                user_id:
+                  type: integer
+                status:
+                  type: string
+                timestamp:
+                  type: string
+                  format: date-time
+
+  schemas:
+    Conversation:
+      type: object
+      properties:
+        _id:
+          type: string
+          description: MongoDB ObjectId
+        type:
+          type: string
+          enum: [private, group]
+        participants:
+          type: array
+          items:
+            type: integer
+        name:
+          type: string
+          description: Group name (only for group chats)
+        avatar:
+          type: string
+          description: Group avatar URL (only for group chats)
+        admin_id:
+          type: integer
+          description: Admin user ID (only for group chats)
+        moderator_ids:
+          type: array
+          items:
+            type: integer
+          description: Moderator user IDs (only for group chats)
+        status:
+          type: string
+          enum: [pending, accepted, declined]
+          description: Message request status
+        initiator_id:
+          type: integer
+          description: User who initiated the conversation
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Message:
+      type: object
+      properties:
+        _id:
+          type: string
+          description: MongoDB ObjectId
+        conversation_id:
+          type: string
+          description: Reference to conversation
+        sender_id:
+          type: integer
+        content:
+          type: string
+        attachments:
+          type: array
+          items:
+            type: string
+          description: Array of file URLs
+        seen_by:
+          type: array
+          items:
+            type: integer
+          description: User IDs who have read the message
+        status:
+          type: string
+          enum: [sent, delivered, read, failed]
+        delivery_info:
+          type: array
+          items:
+            type: object
+            properties:
+              user_id:
+                type: integer
+              status:
+                type: string
+              timestamp:
+                type: string
+                format: date-time
+        delivered_at:
+          type: string
+          format: date-time
+        read_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        clientId:
+          type: string
+          description: Client-generated UUID for deduplication
