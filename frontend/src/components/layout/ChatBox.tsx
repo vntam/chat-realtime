@@ -91,14 +91,21 @@ export default function ChatBox() {
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-background">
+    <div className="flex-1 flex flex-col bg-gradient-to-b from-gray-50 to-white">
       {/* Chat Header */}
-      <div className="h-16 bg-card border-b border-border px-6 flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold">{getConversationName()}</h2>
-          <p className="text-xs text-muted-foreground">
-            {selectedConversation.participants.length} thành viên
-          </p>
+      <div className="h-16 bg-white/80 backdrop-blur-xl border-b border-gray-200 px-6 flex items-center justify-between shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-md">
+            <span className="text-white font-bold text-sm">
+              {getConversationName()[0]?.toUpperCase()}
+            </span>
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">{getConversationName()}</h2>
+            <p className="text-xs text-gray-500">
+              {selectedConversation.participants.length} thành viên
+            </p>
+          </div>
         </div>
       </div>
 

@@ -37,23 +37,24 @@ export default function ChatInput() {
   }
 
   return (
-    <div className="p-4 bg-card border-t border-border">
-      <form onSubmit={handleSubmit} className="flex gap-2">
-        <Input
-          type="text"
-          placeholder="Nhập tin nhắn..."
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          disabled={isSending}
-          className="flex-1"
-        />
+    <div className="p-4 bg-white/80 backdrop-blur border-t border-gray-200">
+      <form onSubmit={handleSubmit} className="flex gap-3 items-end">
+        <div className="flex-1">
+          <Input
+            type="text"
+            placeholder="Nhập tin nhắn..."
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            disabled={isSending}
+            className="w-full bg-gray-50 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl px-4 py-3 text-sm transition-smooth"
+          />
+        </div>
         <Button
           type="submit"
           disabled={!message.trim() || isSending}
-          className="flex-shrink-0"
+          className="flex-shrink-0 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-6 py-3 rounded-xl shadow-lg shadow-blue-500/30 transition-smooth disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <Send className="w-4 h-4 mr-2" />
-          {isSending ? 'Đang gửi...' : 'Gửi'}
+          <Send className="w-4 h-4" />
         </Button>
       </form>
     </div>
