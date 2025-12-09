@@ -53,16 +53,6 @@ package "User Service (PostgreSQL)" as UserService {
   roles ||--o{ user_role : "assigned to"
 }
 
-note right of UserService
-  **REMOVED TABLES:**
-  - groups (migrated to Chat Service)
-  - user_group (migrated to Chat Service)
-  
-  Group chat logic now handled
-  in conversations collection
-  (Chat Service MongoDB)
-end note
-
 ' ==========================
 ' CHAT SERVICE - MongoDB
 ' ==========================

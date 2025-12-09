@@ -49,7 +49,10 @@ export class UploadService {
     // Load file size limits from environment variables
     this.MAX_FILE_SIZE = parseInt(process.env.MAX_FILE_SIZE || '10485760', 10); // Default 10MB
     this.MAX_IMAGE_SIZE = parseInt(process.env.MAX_IMAGE_SIZE || '5242880', 10); // Default 5MB
-    this.MAX_VIDEO_SIZE = parseInt(process.env.MAX_VIDEO_SIZE || '52428800', 10); // Default 50MB
+    this.MAX_VIDEO_SIZE = parseInt(
+      process.env.MAX_VIDEO_SIZE || '52428800',
+      10,
+    ); // Default 50MB
 
     if (this.useS3) {
       this.s3Client = new S3Client({
