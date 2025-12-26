@@ -1,4 +1,5 @@
-import { useState, useEffect, FormEvent } from 'react'
+import { useState, useEffect } from 'react'
+import type { FormEvent } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody, DialogFooter } from '@/components/ui/Dialog'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'

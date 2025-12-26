@@ -108,7 +108,7 @@ export default function UsersPage() {
                           {user.role || 'user'}
                         </span>
                       </TableCell>
-                      <TableCell>{formatDate(user.createdAt)}</TableCell>
+                      <TableCell>{formatDate(user.created_at)}</TableCell>
                       <TableCell className="text-right">
                         <Button
                           variant="ghost"

@@ -1,10 +1,10 @@
 import axios from 'axios'
 
-// Create axios instance
+// Create axios instance - route qua API Gateway
 const axiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_USER_SERVICE_URL || 'http://localhost:3001',
+  baseURL: import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:3000',
   timeout: 10000,
-  withCredentials: true, // Important: Send cookies with requests
+  withCredentials: true, // Important: Send cookies with requests (HttpOnly cookies)
   headers: {
     'Content-Type': 'application/json',
   },
@@ -34,9 +34,9 @@ axiosInstance.interceptors.response.use(
       originalRequest._retry = true
 
       try {
-        // Call refresh endpoint (refreshToken is sent automatically via cookie)
+        // Call refresh endpoint via Gateway (refreshToken is sent automatically via cookie)
         await axios.post(
-          `${import.meta.env.VITE_USER_SERVICE_URL}/auth/refresh`,
+          `${import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:3000'}/auth/refresh`,
           {},
           { withCredentials: true }
         )

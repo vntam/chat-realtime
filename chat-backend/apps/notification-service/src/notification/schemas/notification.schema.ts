@@ -23,6 +23,22 @@ export class Notification {
   @Prop({ required: false })
   related_id?: string;
 
+  // Enhanced message notification fields
+  @Prop({ required: false })
+  sender_id?: number;
+
+  @Prop({ required: false })
+  sender_name?: string;
+
+  @Prop({ required: false })
+  sender_avatar?: string;
+
+  @Prop({ required: false })
+  conversation_name?: string;
+
+  @Prop({ required: false, enum: ['text', 'image', 'file', 'system'] })
+  message_type?: 'text' | 'image' | 'file' | 'system';
+
   @Prop({ type: Date })
   created_at: Date;
 

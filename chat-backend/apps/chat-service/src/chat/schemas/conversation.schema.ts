@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument } from 'mongoose';
+import { Types, HydratedDocument } from 'mongoose';
+import { Message, MessageSchema } from './message.schema';
 
 export type ConversationDocument = HydratedDocument<Conversation>;
 
@@ -34,6 +35,12 @@ export class Conversation {
 
   @Prop({ type: Number })
   initiator_id: number;
+
+  @Prop({ type: Types.ObjectId, ref: 'Message' })
+  last_message_id?: Types.ObjectId;
+
+  @Prop({ type: MessageSchema })
+  lastMessage?: Message;
 
   @Prop({ type: Date, default: Date.now })
   created_at: Date;

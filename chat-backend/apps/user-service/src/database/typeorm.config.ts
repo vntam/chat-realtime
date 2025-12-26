@@ -18,6 +18,7 @@ const baseOptions = (): DataSourceOptions => {
     DB_NAME,
     DB_SSL,
     USER_DB_URL,
+    TYPEORM_SYNCHRONIZE,
   } = process.env;
 
   let connection: Partial<ReturnType<typeof parseConnectionString>> = {};
@@ -48,7 +49,7 @@ const baseOptions = (): DataSourceOptions => {
     password,
     database,
     entities,
-    synchronize: false,
+    synchronize: TYPEORM_SYNCHRONIZE === 'true',
     logging: process.env.TYPEORM_LOGGING === 'true',
     migrationsRun: process.env.TYPEORM_MIGRATIONS_RUN === 'true',
     ssl,

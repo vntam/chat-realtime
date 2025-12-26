@@ -1,0 +1,233 @@
+services:
+  # =========================
+  # DATABASES
+  # =========================
+  
+  # PostgreSQL cho User Service
+  postgres:
+    image: postgres:16-alpine
+    container_name: chat-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres123
+      POSTGRES_DB: chat_user_service
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - chat-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MongoDB cho Chat Service và Notification Service
+  mongodb:
+    image: mongo:7
+    container_name: chat-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: mongo123
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - chat-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # RabbitMQ Message Broker
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: chat-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: rabbitmq123
+    ports:
+      - "5672:5672"    # AMQP port
+      - "15672:15672"  # Management UI
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - chat-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # =========================
+  # BACKEND SERVICES
+  # =========================
+
+  # API Gateway
+  api-gateway:
+    build:
+      context: ./chat-backend
+      dockerfile: Dockerfile
+      args:
+        APP_NAME: api-gateway
+    container_name: chat-api-gateway
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      GATEWAY_PORT: 3000
+      USER_SERVICE_URL: http://user-service:3001
+      CHAT_SERVICE_URL: http://chat-service:3002
+      NOTIFICATION_SERVICE_URL: http://notification-service:3003
+      ALLOWED_ORIGINS: http://localhost:8080,http://localhost:5173
+    networks:
+      - chat-network
+    depends_on:
+      - user-service
+      - chat-service
+      - notification-service
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # User Service
+  user-service:
+    build:
+      context: ./chat-backend
+      dockerfile: Dockerfile
+      args:
+        APP_NAME: user-service
+    container_name: chat-user-service
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: production
+      USER_DB_URL: postgresql://postgres:postgres123@postgres:5432/chat_user_service
+      DB_SSL: "false"
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-supersecret_access}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-supersecret_refresh}
+      USER_JWT_ACCESS_EXPIRES: 15m
+      USER_JWT_REFRESH_EXPIRES: 7d
+      RABBITMQ_URL: amqp://admin:rabbitmq123@rabbitmq:5672
+      TYPEORM_SYNCHRONIZE: "true"
+    networks:
+      - chat-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Chat Service
+  chat-service:
+    build:
+      context: ./chat-backend
+      dockerfile: Dockerfile
+      args:
+        APP_NAME: chat-service
+    container_name: chat-chat-service
+    restart: unless-stopped
+    ports:
+      - "3002:3002"
+    environment:
+      NODE_ENV: production
+      CHAT_DB_URL: mongodb://admin:mongo123@mongodb:27017/chat_db?authSource=admin
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-supersecret_access}
+      RABBITMQ_URL: amqp://admin:rabbitmq123@rabbitmq:5672
+      USER_SERVICE_URL: http://user-service:3001
+    networks:
+      - chat-network
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3002/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Notification Service
+  notification-service:
+    build:
+      context: ./chat-backend
+      dockerfile: Dockerfile
+      args:
+        APP_NAME: notification-service
+    container_name: chat-notification-service
+    restart: unless-stopped
+    ports:
+      - "3003:3003"
+    environment:
+      NODE_ENV: production
+      NOTIFICATION_DB_URL: mongodb://admin:mongo123@mongodb:27017/notification_db?authSource=admin
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-supersecret_access}
+      RABBITMQ_URL: amqp://admin:rabbitmq123@rabbitmq:5672
+      USER_SERVICE_URL: http://user-service:3001
+    networks:
+      - chat-network
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3003/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # =========================
+  # FRONTEND
+  # =========================
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_GATEWAY_URL: http://localhost:3000
+        VITE_CHAT_WS_URL: http://localhost:3002
+        VITE_NOTIFICATION_WS_URL: http://localhost:3003
+    container_name: chat-frontend
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    networks:
+      - chat-network
+    depends_on:
+      - api-gateway
+
+# =========================
+# NETWORKS
+# =========================
+networks:
+  chat-network:
+    driver: bridge
+
+# =========================
+# VOLUMES
+# =========================
+volumes:
+  postgres_data:
+    driver: local
+  mongodb_data:
+    driver: local
+  rabbitmq_data:
+    driver: local

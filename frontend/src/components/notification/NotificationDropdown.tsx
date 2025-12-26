@@ -1,31 +1,63 @@
 import { useEffect, useState } from 'react'
-import { Bell, Check, CheckCheck, Trash2, MessageSquare, X } from 'lucide-react'
+import { Bell, Check, CheckCheck, Trash2, MessageSquare, Image, File, Users, X } from 'lucide-react'
 import { useNotificationStore } from '@/store/notificationStore'
+import { useToastStore } from '@/store/toastStore'
 import { notificationService } from '@/services/notificationService'
 import { initializeNotificationSocket, getNotificationSocket } from '@/lib/socket'
 import type { Notification } from '@/services/notificationService'
 import Button from '@/components/ui/Button'
+import Avatar from '@/components/ui/Avatar'
 
 export default function NotificationDropdown() {
-  const { notifications, unreadCount, setNotifications, addNotification, markAsRead, markAllAsRead, removeNotification } =
+  const { notifications, unreadCount, setNotifications, setUnreadCount, addNotification, markAsRead, markAllAsRead, removeNotification } =
     useNotificationStore()
+  const { addToast } = useToastStore()
   const [isOpen, setIsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
 
   useEffect(() => {
     fetchNotifications()
-    
+
     // Initialize notification socket
     const token = sessionStorage.getItem('access_token')
     if (token) {
       initializeNotificationSocket(token)
-      
+
       const notifSocket = getNotificationSocket()
       if (notifSocket) {
         // Listen for new notifications
         notifSocket.on('notification:created', (notification: Notification) => {
           console.log('Received notification:', notification)
           addNotification(notification)
+
+          // Show toast notification
+          addToast({
+            title: notification.title,
+            message: notification.content,
+            type: 'info',
+            duration: 5000,
+          })
+
+          // Play notification sound (optional)
+          playNotificationSound()
+        })
+
+        // Listen for notification count updates from server
+        notifSocket.on('notification:count', (data: { count: number }) => {
+          console.log('Unread count updated from server:', data.count)
+          setUnreadCount(data.count)
+        })
+
+        // Listen for notification read events
+        notifSocket.on('notification:read', (data: { notificationId: string }) => {
+          console.log('Notification marked as read:', data.notificationId)
+          markAsRead(data.notificationId)
+        })
+
+        // Listen for notification deleted events
+        notifSocket.on('notification:deleted', (data: { notificationId: string }) => {
+          console.log('Notification deleted:', data.notificationId)
+          removeNotification(data.notificationId)
         })
       }
     }
@@ -34,9 +66,25 @@ export default function NotificationDropdown() {
       const notifSocket = getNotificationSocket()
       if (notifSocket) {
         notifSocket.off('notification:created')
+        notifSocket.off('notification:count')
+        notifSocket.off('notification:read')
+        notifSocket.off('notification:deleted')
       }
     }
-  }, [])
+  }, [addNotification, addToast, markAsRead, removeNotification, setUnreadCount])
+
+  const playNotificationSound = () => {
+    // Optional: Play a subtle notification sound
+    try {
+      const audio = new Audio('/notification.mp3')
+      audio.volume = 0.3
+      audio.play().catch(() => {
+        // Ignore errors if sound file doesn't exist or autoplay is blocked
+      })
+    } catch (error) {
+      // Ignore sound errors
+    }
+  }
 
   const fetchNotifications = async () => {
     setIsLoading(true)
@@ -94,16 +142,20 @@ export default function NotificationDropdown() {
     return date.toLocaleDateString('vi-VN')
   }
 
-  const getNotificationIcon = (type: Notification['type']) => {
-    switch (type) {
-      case 'new_message':
-      case 'message':
-        return <MessageSquare className="w-5 h-5 text-blue-600" />
-      case 'group_invite':
-        return <MessageSquare className="w-5 h-5 text-indigo-600" />
-      default:
-        return <Bell className="w-5 h-5 text-gray-600" />
+  const getNotificationIcon = (type: Notification['type'], messageType?: Notification['message_type']) => {
+    // For message type notifications, check the message_type
+    if (type === 'message' || type === 'new_message') {
+      if (messageType === 'image') {
+        return <Image className="w-5 h-5 text-purple-600" />
+      } else if (messageType === 'file') {
+        return <File className="w-5 h-5 text-orange-600" />
+      }
+      return <MessageSquare className="w-5 h-5 text-blue-600" />
     }
+    if (type === 'group_invite') {
+      return <Users className="w-5 h-5 text-indigo-600" />
+    }
+    return <Bell className="w-5 h-5 text-gray-600" />
   }
 
   return (
@@ -115,7 +167,7 @@ export default function NotificationDropdown() {
       >
         <Bell className="w-5 h-5 text-gray-700 group-hover:text-blue-600 transition-smooth" />
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 min-w-[20px] h-[20px] bg-gradient-to-br from-red-500 to-red-600 text-white text-xs font-bold rounded-full flex items-center justify-center px-1 shadow-lg animate-pulse">
+          <span className="absolute -top-1 -right-1 min-w-[20px] h-[20px] bg-gradient-to-br from-red-500 to-red-600 text-white text-xs font-bold rounded-full flex items-center justify-center px-1 shadow-lg animate-notification-pulse">
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}
@@ -173,27 +225,46 @@ export default function NotificationDropdown() {
                   return (
                   <div
                     key={notification.id}
-                    className={`p-4 border-b border-gray-200 last:border-b-0 hover:bg-gray-50 transition-smooth cursor-pointer ${
+                    className={`p-4 border-b border-gray-200 last:border-b-0 hover:bg-gray-50 transition-smooth cursor-pointer animate-fade-in ${
                       !isRead ? 'bg-blue-50' : ''
                     }`}
                   >
                     <div className="flex items-start gap-3">
-                      {/* Icon */}
-                      <div className="flex-shrink-0 mt-1 w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                        {getNotificationIcon(notification.type)}
+                      {/* Avatar or Icon */}
+                      <div className="flex-shrink-0">
+                        <Avatar
+                          src={notification.sender_avatar}
+                          username={notification.sender_name}
+                          size="lg"
+                          className="border-2 border-white shadow-sm"
+                        />
                       </div>
 
                       {/* Content */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2 mb-1">
-                          <h4 className="font-semibold text-sm text-gray-900">{notification.title}</h4>
+                          <div className="flex items-center gap-2">
+                            {notification.sender_name && (
+                              <span className="font-semibold text-sm text-gray-900">
+                                {notification.sender_name}
+                              </span>
+                            )}
+                            {notification.conversation_name && notification.type === 'message' && (
+                              <span className="text-xs text-gray-500">
+                                trong <span className="font-medium">{notification.conversation_name}</span>
+                              </span>
+                            )}
+                          </div>
                           {!isRead && (
                             <div className="w-2.5 h-2.5 bg-blue-600 rounded-full flex-shrink-0 mt-1 animate-pulse" />
                           )}
                         </div>
-                        <p className="text-sm text-gray-600 mb-2 line-clamp-2">
-                          {notification.content}
-                        </p>
+                        <div className="flex items-center gap-2 mb-2">
+                          {getNotificationIcon(notification.type, notification.message_type)}
+                          <p className="text-sm text-gray-700 line-clamp-2 flex-1">
+                            {notification.content}
+                          </p>
+                        </div>
                         <div className="flex items-center justify-between">
                           <span className="text-xs text-gray-500 font-medium">
                             {formatTime(createdAt)}

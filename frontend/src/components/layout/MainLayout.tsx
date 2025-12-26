@@ -33,7 +33,7 @@ export default function MainLayout() {
   }, [addNotification])
 
   return (
-    <div className="h-screen flex flex-col">
+    <div className="h-screen flex flex-col bg-gray-50 dark:bg-[#1c1e21] transition-colors duration-200">
       {/* Header */}
       <Header />
 
@@ -43,7 +43,7 @@ export default function MainLayout() {
         <Sidebar />
 
         {/* Content Area */}
-        <main className="flex-1 flex">
+        <main className="flex-1 flex overflow-hidden">
           <Outlet />
         </main>
       </div>

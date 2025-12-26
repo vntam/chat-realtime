@@ -10,6 +10,11 @@ export enum MessageStatus {
   FAILED = 'failed',
 }
 
+export enum MessageType {
+  USER = 'user',        // Regular message from user
+  SYSTEM = 'system',    // System message (join, leave, etc.)
+}
+
 export interface DeliveryInfo {
   user_id: number;
   status: MessageStatus;
@@ -31,6 +36,24 @@ export class Message {
 
   @Prop({ required: true })
   content: string;
+
+  @Prop({
+    type: String,
+    enum: Object.values(MessageType),
+    default: MessageType.USER,
+  })
+  type: MessageType;
+
+  // For system messages: store related user IDs and event type
+  // Example: { event: 'member_added', userId: 123, actorId: 456, actorName: 'John', targetName: 'Jane' }
+  @Prop({ type: Object, default: null })
+  system_data?: {
+    event: 'member_added' | 'member_removed' | 'group_created' | 'group_deleted';
+    userId?: number;
+    actorId?: number;  // Who performed the action
+    actorName?: string;  // Name of actor
+    targetName?: string;  // Name of target user
+  };
 
   @Prop({ type: [String], default: [] })
   attachments: string[];

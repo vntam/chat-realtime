@@ -1,8 +1,9 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { JwtModule } from '@nestjs/jwt';
-import { ClientsModule, Transport } from '@nestjs/microservices';
+import { HttpModule } from '@nestjs/axios';
 import { NotificationController } from './notification.controller';
+import { NotificationRabbitMQController } from './notification-rabbitmq.controller';
 import { NotificationService } from './notification.service';
 import { NotificationGateway } from './notification.gateway';
 import {
@@ -19,18 +20,9 @@ import {
       secret: process.env.JWT_ACCESS_SECRET || 'supersecret_access',
       signOptions: { expiresIn: '15m' },
     }),
-    ClientsModule.register([
-      {
-        name: 'USER_SERVICE',
-        transport: Transport.TCP,
-        options: {
-          host: process.env.USER_SERVICE_HOST || 'localhost',
-          port: parseInt(process.env.USER_SERVICE_PORT || '3001', 10),
-        },
-      },
-    ]),
+    HttpModule,
   ],
-  controllers: [NotificationController],
+  controllers: [NotificationController, NotificationRabbitMQController],
   providers: [NotificationService, NotificationGateway],
   exports: [NotificationService, NotificationGateway],
 })

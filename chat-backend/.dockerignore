@@ -1,0 +1,10 @@
+# .dockerignore
+.git
+.github
+.vscode
+.idea
+node_modules
+dist
+npm-debug.log
+README.md
+*.env

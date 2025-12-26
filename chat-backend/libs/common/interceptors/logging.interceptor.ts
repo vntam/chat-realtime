@@ -12,8 +12,20 @@ import { v4 as uuidv4 } from 'uuid';
 @Injectable()
 export class LoggingInterceptor implements NestInterceptor {
   private readonly logger = new Logger('HTTP');
+  private readonly microserviceLogger = new Logger('Microservice');
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+    // Check if this is a microservice context (RabbitMQ, TCP, etc.)
+    const isMicroservice = context.getType() === 'rpc';
+
+    if (isMicroservice) {
+      return this.interceptMicroservice(context, next);
+    }
+
+    return this.interceptHttp(context, next);
+  }
+
+  private interceptHttp(context: ExecutionContext, next: CallHandler): Observable<any> {
     const request = context.switchToHttp().getRequest();
     const { method, url, body, headers, ip } = request;
     const userAgent = headers['user-agent'] || '';
@@ -74,6 +86,57 @@ export class LoggingInterceptor implements NestInterceptor {
           }),
         );
 
+        throw error;
+      }),
+    );
+  }
+
+  private interceptMicroservice(context: ExecutionContext, next: CallHandler): Observable<any> {
+    // For microservice context, pattern and args might not be available through standard methods
+    // Use reflection to get the pattern if available
+    let pattern: any = {};
+    let data: any = {};
+
+    try {
+      const args = context.getArgs();
+      if (args && args.length > 0) {
+        // For RabbitMQ events, the pattern is usually in the first argument
+        data = args[0] || {};
+      }
+
+      // Try to get the pattern from the context handler
+      const handler = context.getHandler();
+      if (handler) {
+        pattern = handler.name || 'unknown';
+      }
+    } catch (e) {
+      // If we can't get pattern/data, just skip logging details
+    }
+
+    const now = Date.now();
+
+    // Log incoming microservice event
+    this.microserviceLogger.log(
+      `Received event: ${JSON.stringify(pattern)}`,
+      JSON.stringify({
+        pattern,
+        data: this.sanitizeBody(data),
+      }),
+    );
+
+    return next.handle().pipe(
+      tap(() => {
+        const responseTime = Date.now() - now;
+        this.microserviceLogger.log(
+          `Event processed: ${JSON.stringify(pattern)} - ${responseTime}ms`,
+        );
+      }),
+      catchError((error) => {
+        const responseTime = Date.now() - now;
+        this.microserviceLogger.error(
+          `Event failed: ${JSON.stringify(pattern)} - ${responseTime}ms`,
+          error.message,
+        );
         throw error;
       }),
     );

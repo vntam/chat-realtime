@@ -1,12 +1,15 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { User, LogOut, Settings, MessageSquare } from 'lucide-react'
+import { LogOut, Settings, MessageSquare, Moon, Sun } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
+import { useThemeStore } from '@/store/themeStore'
 import NotificationDropdown from '@/components/notification/NotificationDropdown'
+import Avatar from '@/components/ui/Avatar'
 
 export default function Header() {
   const navigate = useNavigate()
   const { user, logout } = useAuthStore()
+  const { theme, toggleTheme } = useThemeStore()
   const [showUserMenu, setShowUserMenu] = useState(false)
 
   const handleLogout = () => {
@@ -15,7 +18,7 @@ export default function Header() {
   }
 
   return (
-    <header className="h-16 bg-white/80 backdrop-blur-xl border-b border-gray-200 px-6 flex items-center justify-between shadow-sm sticky top-0 z-30">
+    <header className="h-16 bg-white dark:bg-[#242526] backdrop-blur-xl border-b border-gray-200 dark:border-[#3a3b3c] px-6 flex items-center justify-between shadow-sm sticky top-0 z-30 transition-colors duration-200">
       {/* App Title */}
       <div className="flex items-center gap-3">
         <div className="relative">
@@ -29,6 +32,19 @@ export default function Header() {
 
       {/* Right Actions */}
       <div className="flex items-center gap-3">
+        {/* Theme Toggle */}
+        <button
+          onClick={toggleTheme}
+          className="p-2.5 rounded-xl hover:bg-gray-100 dark:hover:bg-[#3a3b3c] transition-colors duration-200 group"
+          title={theme === 'dark' ? 'Chế độ sáng' : 'Chế độ tối'}
+        >
+          {theme === 'dark' ? (
+            <Sun className="w-5 h-5 text-yellow-500 group-hover:scale-110 transition-transform" />
+          ) : (
+            <Moon className="w-5 h-5 text-gray-600 group-hover:scale-110 transition-transform" />
+          )}
+        </button>
+
         {/* Notification Dropdown */}
         <NotificationDropdown />
 
@@ -36,14 +52,15 @@ export default function Header() {
         <div className="relative">
           <button
             onClick={() => setShowUserMenu(!showUserMenu)}
-            className="flex items-center gap-3 px-3 py-2 hover:bg-gray-100 rounded-xl transition-smooth group"
+            className="flex items-center gap-3 px-3 py-2 hover:bg-gray-100 dark:hover:bg-[#3a3b3c] rounded-xl transition-smooth group"
           >
-            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-md group-hover:shadow-lg transition-smooth">
-              <span className="text-white font-semibold text-sm">
-                {user?.username?.[0]?.toUpperCase() || 'U'}
-              </span>
-            </div>
-            <span className="text-sm font-medium text-gray-700">{user?.username || 'User'}</span>
+            <Avatar
+              src={user?.avatar_url}
+              username={user?.username}
+              size="lg"
+              className="shadow-md group-hover:shadow-lg transition-smooth"
+            />
+            <span className="text-sm font-medium text-gray-700 dark:text-[#e4e6eb]">{user?.username || 'User'}</span>
           </button>
 
           {/* Dropdown Menu */}
@@ -56,18 +73,19 @@ export default function Header() {
               />
 
               {/* Menu */}
-              <div className="absolute right-0 mt-2 w-64 bg-white border border-gray-200 rounded-xl shadow-xl z-20 overflow-hidden">
+              <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-[#242526] border border-gray-200 dark:border-[#3a3b3c] rounded-xl shadow-xl z-20 overflow-hidden">
                 {/* User Info */}
-                <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 border-b border-gray-200">
+                <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-[#2f3036] dark:to-[#3a3b3c] border-b border-gray-200 dark:border-[#3a3b3c]">
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-md">
-                      <span className="text-white font-bold text-lg">
-                        {user?.username?.[0]?.toUpperCase() || 'U'}
-                      </span>
-                    </div>
+                    <Avatar
+                      src={user?.avatar_url}
+                      username={user?.username}
+                      size="xl"
+                      className="shadow-md"
+                    />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-900 truncate">{user?.username}</p>
-                      <p className="text-xs text-gray-600 truncate">{user?.email}</p>
+                      <p className="text-sm font-semibold text-gray-900 dark:text-[#e4e6eb] truncate">{user?.username}</p>
+                      <p className="text-xs text-gray-600 dark:text-[#b0b3b8] truncate">{user?.email}</p>
                     </div>
                   </div>
                 </div>
@@ -75,29 +93,29 @@ export default function Header() {
                 {/* Menu Items */}
                 <div className="p-2">
                   <button
-                    className="w-full flex items-center gap-3 px-3 py-2.5 text-sm hover:bg-gray-100 rounded-lg transition-smooth group"
+                    className="w-full flex items-center gap-3 px-3 py-2.5 text-sm hover:bg-gray-100 dark:hover:bg-[#3a3b3c] rounded-lg transition-smooth group"
                     onClick={() => {
                       setShowUserMenu(false)
-                      // Navigate to settings page (will implement later)
+                      navigate('/settings')
                     }}
                   >
-                    <div className="w-8 h-8 rounded-lg bg-gray-100 group-hover:bg-gray-200 flex items-center justify-center transition-smooth">
-                      <Settings className="w-4 h-4 text-gray-700" />
+                    <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-[#3a3b3c] group-hover:bg-gray-200 dark:group-hover:bg-[#4e4f50] flex items-center justify-center transition-smooth">
+                      <Settings className="w-4 h-4 text-gray-700 dark:text-[#e4e6eb]" />
                     </div>
-                    <span className="text-gray-700 font-medium">Cài đặt</span>
+                    <span className="text-gray-700 dark:text-[#e4e6eb] font-medium">Cài đặt</span>
                   </button>
 
                   <button
-                    className="w-full flex items-center gap-3 px-3 py-2.5 text-sm hover:bg-red-50 rounded-lg transition-smooth group"
+                    className="w-full flex items-center gap-3 px-3 py-2.5 text-sm hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-smooth group"
                     onClick={() => {
                       setShowUserMenu(false)
                       handleLogout()
                     }}
                   >
-                    <div className="w-8 h-8 rounded-lg bg-red-100 group-hover:bg-red-200 flex items-center justify-center transition-smooth">
-                      <LogOut className="w-4 h-4 text-red-600" />
+                    <div className="w-8 h-8 rounded-lg bg-red-100 dark:bg-red-900/30 group-hover:bg-red-200 dark:group-hover:bg-red-900/50 flex items-center justify-center transition-smooth">
+                      <LogOut className="w-4 h-4 text-red-600 dark:text-red-400" />
                     </div>
-                    <span className="text-red-600 font-medium">Đăng xuất</span>
+                    <span className="text-red-600 dark:text-red-400 font-medium">Đăng xuất</span>
                   </button>
                 </div>
               </div>

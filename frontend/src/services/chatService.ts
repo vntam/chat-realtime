@@ -1,19 +1,17 @@
 import axios from 'axios'
 
 const chatAPI = axios.create({
-  baseURL: import.meta.env.VITE_CHAT_SERVICE_URL || 'http://localhost:3002',
+  baseURL: import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:3000',
   timeout: 10000,
+  withCredentials: true, // Send HttpOnly cookies automatically
   headers: {
     'Content-Type': 'application/json',
   },
 })
 
-// Add access token from sessionStorage (cross-port solution)
+// No need to manually add token - cookies are sent automatically with withCredentials: true
 chatAPI.interceptors.request.use((config) => {
-  const token = sessionStorage.getItem('access_token')
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
-  }
+  // HttpOnly cookies are automatically sent by browser
   return config
 })
 
@@ -75,6 +73,9 @@ export interface Conversation {
   id: string
   name?: string
   isGroup: boolean
+  status?: string
+  admin_id?: number
+  moderator_ids?: number[]
   participants: Array<{
     id: string
     user_id?: number
@@ -82,11 +83,13 @@ export interface Conversation {
     email?: string
   }>
   lastMessage?: {
+    id?: string
     content: string
     createdAt: string
-    sender: {
+    sender_id?: number
+    sender?: {
       id: string
-      name: string
+      name?: string
     }
   }
   createdAt: string
@@ -100,10 +103,16 @@ export interface Message {
   senderId?: string
   sender_id?: string
   content: string
-  sender: {
+  sender?: {
     id: string
     name?: string
     email?: string
+  }
+  type?: 'user' | 'system'
+  system_data?: {
+    event: 'member_added' | 'member_removed' | 'group_created' | 'group_deleted'
+    userId?: number
+    actorId?: number
   }
   createdAt: string
   updatedAt: string
@@ -142,8 +151,18 @@ export const chatService = {
 
   // Get messages in a conversation
   getMessages: async (conversationId: string): Promise<Message[]> => {
-    const response = await chatAPI.get(`/conversations/${conversationId}/messages`)
-    return response.data
+    console.log('[chatService] getMessages called for conversationId:', conversationId)
+    console.log('[chatService] Base URL:', chatAPI.defaults.baseURL)
+    try {
+      const response = await chatAPI.get(`/conversations/${conversationId}/messages`)
+      console.log('[chatService] Response status:', response.status)
+      console.log('[chatService] Response data:', response.data)
+      console.log('[chatService] Response data length:', Array.isArray(response.data) ? response.data.length : 'not an array')
+      return response.data
+    } catch (error) {
+      console.error('[chatService] Error in getMessages:', error)
+      throw error
+    }
   },
 
   // Send a message
@@ -160,6 +179,44 @@ export const chatService = {
   // Accept conversation (message request)
   acceptConversation: async (id: string): Promise<Conversation> => {
     const response = await chatAPI.post(`/conversations/${id}/accept`)
+    return response.data
+  },
+
+  // Set nickname for a user in conversation
+  setNickname: async (conversationId: string, targetUserId: number, nickname: string): Promise<any> => {
+    const response = await chatAPI.post(`/conversations/${conversationId}/nicknames`, {
+      targetUserId,
+      nickname,
+    })
+    return response.data
+  },
+
+  // Remove nickname
+  removeNickname: async (conversationId: string, targetUserId: number): Promise<void> => {
+    await chatAPI.delete(`/conversations/${conversationId}/nicknames/${targetUserId}`)
+  },
+
+  // Get all nicknames for current user in conversation
+  getNicknames: async (conversationId: string): Promise<any[]> => {
+    const response = await chatAPI.get(`/conversations/${conversationId}/nicknames`)
+    return response.data
+  },
+
+  // Remove member from conversation (leave group)
+  removeMemberFromConversation: async (conversationId: string, userId: number, actorId: number): Promise<any> => {
+    const response = await chatAPI.post(`/conversations/${conversationId}/remove-member`, {
+      userId,
+      actorId,
+    })
+    return response.data
+  },
+
+  // Add member to conversation
+  addMemberToConversation: async (conversationId: string, userId: number, actorName?: string): Promise<any> => {
+    const response = await chatAPI.post(`/conversations/${conversationId}/add-member`, {
+      userId,
+      userName: actorName,
+    })
     return response.data
   },
 }

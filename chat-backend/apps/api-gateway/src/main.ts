@@ -73,23 +73,28 @@ async function bootstrap() {
     process.env.NOTIFICATION_SERVICE_URL ?? 'http://localhost:3003';
 
   // REST API reverse proxy
+  // User Service routes
   app.use('/auth', createReverseProxyMiddleware('/auth', userServiceUrl));
-  app.use('/user', createReverseProxyMiddleware('/user', userServiceUrl));
-  app.use('/chat', createReverseProxyMiddleware('/chat', chatServiceUrl));
-  app.use('/upload', createReverseProxyMiddleware('/upload', chatServiceUrl));
+  app.use('/users', createReverseProxyMiddleware('/users', userServiceUrl));
+  app.use('/roles', createReverseProxyMiddleware('/roles', userServiceUrl));
+
+  // Chat Service routes
   app.use(
-    '/notification',
-    createReverseProxyMiddleware('/notification', notificationServiceUrl),
+    '/conversations',
+    createReverseProxyMiddleware('/conversations', chatServiceUrl),
+  );
+  app.use('/upload', createReverseProxyMiddleware('/upload', chatServiceUrl));
+
+  // Notification Service routes
+  app.use(
+    '/notifications',
+    createReverseProxyMiddleware('/notifications', notificationServiceUrl),
   );
 
   // WebSocket reverse proxy
   app.use(
     '/socket.io',
     createWebSocketProxyMiddleware('/socket.io', chatServiceUrl),
-  );
-  app.use(
-    '/notifications',
-    createWebSocketProxyMiddleware('/notifications', notificationServiceUrl),
   );
 
   const port = process.env.PORT ?? 3000;

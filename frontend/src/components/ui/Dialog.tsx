@@ -1,4 +1,5 @@
-import { ReactNode, useEffect } from 'react'
+import { useEffect } from 'react'
+import type { ReactNode } from 'react'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Button from './Button'
@@ -85,7 +86,7 @@ interface DialogTitleProps {
 }
 
 export function DialogTitle({ children }: DialogTitleProps) {
-  return <h2 className="text-lg font-semibold">{children}</h2>
+  return <h2 className="text-lg font-semibold text-gray-900 dark:text-[#e4e6eb]">{children}</h2>
 }
 
 interface DialogBodyProps {

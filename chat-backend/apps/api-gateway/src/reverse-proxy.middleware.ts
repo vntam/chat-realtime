@@ -14,7 +14,12 @@ export function createReverseProxyMiddleware(
   const options: Options<any, any> = {
     target,
     changeOrigin: true,
-    pathRewrite: (reqPath: string) => reqPath, // keep original path
+    pathRewrite: (reqPath: string, req: any) => {
+      // Express strips the prefix before passing to middleware
+      // We need to add it back for downstream services
+      // Example: /auth/login → /login (stripped by express) → /auth/login (add back)
+      return path + reqPath;
+    },
     ws: false, // WebSocket handled separately
     on: {
       proxyReq: (proxyReq, req: any) => {
@@ -29,14 +34,21 @@ export function createReverseProxyMiddleware(
             JSON.stringify(req.user.roles || []),
           );
         }
-        logger.debug(
-          `[${req.id}] Proxy ${req.method} ${req.originalUrl} → ${target}`,
-        );
+
+        // IMPORTANT: Forward cookies to downstream services
+        // This is required for HttpOnly cookie authentication
+        if (req.headers.cookie) {
+          proxyReq.setHeader('cookie', req.headers.cookie);
+        }
+
+        console.log(`[ReverseProxy] [${req.id}] Proxy ${req.method} ${req.originalUrl} → ${target}${path}${req.path}`);
       },
       proxyRes: (proxyRes, req: any) => {
         proxyRes.headers['x-trace-id'] = req.id;
+        console.log(`[ReverseProxy] [${req.id}] Response status: ${proxyRes.statusCode} for ${req.method} ${req.originalUrl}`);
       },
       error: (err, req: any, res) => {
+        console.error(`[ReverseProxy] [${req.id}] Proxy error: ${err.message}`, err);
         logger.error(`[${req.id}] Proxy error: ${err.message}`);
         res.status(502).json({
           statusCode: 502,

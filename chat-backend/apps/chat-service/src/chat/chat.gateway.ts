@@ -4,6 +4,7 @@ import {
   SubscribeMessage,
   OnGatewayConnection,
   OnGatewayDisconnect,
+  OnGatewayInit,
   MessageBody,
   ConnectedSocket,
 } from '@nestjs/websockets';
@@ -12,6 +13,7 @@ import { Logger, UnauthorizedException, Inject } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ClientProxy } from '@nestjs/microservices';
 import { ChatService } from './chat.service';
+import { SocketService } from './socket.service';
 import {
   CreateConversationDto,
   SendMessageDto,
@@ -43,7 +45,7 @@ interface WsAck {
     credentials: true,
   },
 })
-export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit {
   @WebSocketServer()
   server: Server;
 
@@ -53,9 +55,16 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly chatService: ChatService,
     private readonly jwtService: JwtService,
     private readonly metricsService: MetricsService,
+    private readonly socketService: SocketService,
     @Inject('NOTIFICATION_SERVICE')
     private readonly notificationClient: ClientProxy,
   ) {}
+
+  afterInit(server: Server) {
+    // Set the server instance on SocketService so controllers can use it
+    this.socketService.setServer(server);
+    this.logger.log('WebSocket server initialized and set on SocketService');
+  }
 
   // ============ CONNECTION LIFECYCLE ============
 
@@ -106,6 +115,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
    * Update active connections count metric
    */
   private updateActiveConnectionsMetric() {
+    if (!this.server?.sockets?.sockets) {
+      return;
+    }
     const sockets = this.server.sockets.sockets;
     const activeConnections = sockets.size;
     this.metricsService.setActiveConnections(activeConnections);
@@ -134,21 +146,26 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() payload: { conversationId: string },
   ): Promise<WsAck> {
     try {
+      const roomName = `conversation:${payload.conversationId}`
+      this.logger.log(`User ${client.userId} attempting to join room: ${roomName}`)
+
       const isMember = await this.verifyMembership(
         payload.conversationId,
         client.userId!,
       );
       if (!isMember) {
+        this.logger.warn(`User ${client.userId} NOT a member of conversation ${payload.conversationId}`)
         return this.ack(false, null, {
           code: 'FORBIDDEN',
           message: 'Not a participant',
         });
       }
 
-      await client.join(`conversation:${payload.conversationId}`);
+      await client.join(roomName);
       this.logger.log(
-        `User ${client.userId} joined conversation ${payload.conversationId}`,
+        `User ${client.userId} joined conversation ${payload.conversationId}, socket room: ${roomName}`,
       );
+
       return this.ack(true);
     } catch (error) {
       this.logger.error(`Join conversation error: ${error.message}`);
@@ -305,7 +322,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   async handleAddMember(
     @ConnectedSocket() client: AuthSocket,
     @MessageBody()
-    payload: { conversationId: string; userId: number },
+    payload: { conversationId: string; userId: number; userName?: string; actorName?: string },
   ): Promise<WsAck> {
     try {
       const dto: AddMemberDto = { userId: payload.userId } as AddMemberDto;
@@ -313,12 +330,29 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         payload.conversationId,
         dto.userId,
         client.userId!,
+        payload.userName,
+        payload.actorName,
       );
 
       // Get conversation details for notification
       const conversation = await this.chatService.findConversationById(
         payload.conversationId,
       );
+
+      // Broadcast system message to all members in the conversation
+      if (result.systemMessage) {
+        const sysMsg = result.systemMessage;
+        this.server
+          .to(`conversation:${payload.conversationId}`)
+          .emit('message:created', {
+            _id: sysMsg._id.toString(),
+            sender_id: sysMsg.sender_id,
+            content: sysMsg.content,
+            type: sysMsg.type,
+            system_data: sysMsg.system_data,
+            created_at: sysMsg.created_at,
+          });
+      }
 
       // Notify all members and the new member via WebSocket
       this.server
@@ -330,6 +364,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       this.server.to(`user:${payload.userId}`).emit('conversation:invited', {
         conversationId: payload.conversationId,
+        conversation: result.conversation,
       });
 
       // Send notification via RabbitMQ for offline users
@@ -344,7 +379,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         `Group invite notification sent for user ${payload.userId} to conversation ${payload.conversationId}`,
       );
 
-      return this.ack(true, result);
+      return this.ack(true, result.conversation);
     } catch (error) {
       this.logger.error(`Add member error: ${error.message}`);
       return this.ack(false, null, {
@@ -358,14 +393,30 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   async handleRemoveMember(
     @ConnectedSocket() client: AuthSocket,
     @MessageBody()
-    payload: { conversationId: string; userId: number },
+    payload: { conversationId: string; userId: number; userName?: string },
   ): Promise<WsAck> {
     try {
-      await this.chatService.removeMember(
+      const result = await this.chatService.removeMember(
         payload.conversationId,
         payload.userId,
         client.userId!,
+        payload.userName,
       );
+
+      // Broadcast system message to all members in the conversation
+      if (result.systemMessage) {
+        const sysMsg = result.systemMessage;
+        this.server
+          .to(`conversation:${payload.conversationId}`)
+          .emit('message:created', {
+            _id: sysMsg._id.toString(),
+            sender_id: sysMsg.sender_id,
+            content: sysMsg.content,
+            type: sysMsg.type,
+            system_data: sysMsg.system_data,
+            created_at: sysMsg.created_at,
+          });
+      }
 
       this.server
         .to(`conversation:${payload.conversationId}`)
@@ -374,9 +425,75 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
           userId: payload.userId,
         });
 
-      return this.ack(true);
+      return this.ack(true, result.conversation);
     } catch (error) {
       this.logger.error(`Remove member error: ${error.message}`);
+      return this.ack(false, null, {
+        code: error.status === 403 ? 'FORBIDDEN' : 'BAD_REQUEST',
+        message: error.message,
+      });
+    }
+  }
+
+  @SubscribeMessage('conversation:promote-moderator')
+  async handlePromoteModerator(
+    @ConnectedSocket() client: AuthSocket,
+    @MessageBody()
+    payload: { conversationId: string; userId: number; userName?: string },
+  ): Promise<WsAck> {
+    try {
+      const result = await this.chatService.promoteToModerator(
+        payload.conversationId,
+        client.userId!,
+        payload.userId,
+      );
+
+      // Broadcast to all members in the conversation
+      this.server
+        .to(`conversation:${payload.conversationId}`)
+        .emit('conversation:moderator-updated', {
+          conversationId: payload.conversationId,
+          userId: payload.userId,
+          promoted: true,
+          actorId: client.userId!,
+        });
+
+      return this.ack(true, result);
+    } catch (error) {
+      this.logger.error(`Promote moderator error: ${error.message}`);
+      return this.ack(false, null, {
+        code: error.status === 403 ? 'FORBIDDEN' : 'BAD_REQUEST',
+        message: error.message,
+      });
+    }
+  }
+
+  @SubscribeMessage('conversation:demote-moderator')
+  async handleDemoteModerator(
+    @ConnectedSocket() client: AuthSocket,
+    @MessageBody()
+    payload: { conversationId: string; userId: number },
+  ): Promise<WsAck> {
+    try {
+      const result = await this.chatService.demoteModerator(
+        payload.conversationId,
+        client.userId!,
+        payload.userId,
+      );
+
+      // Broadcast to all members in the conversation
+      this.server
+        .to(`conversation:${payload.conversationId}`)
+        .emit('conversation:moderator-updated', {
+          conversationId: payload.conversationId,
+          userId: payload.userId,
+          promoted: false,
+          actorId: client.userId!,
+        });
+
+      return this.ack(true, result);
+    } catch (error) {
+      this.logger.error(`Demote moderator error: ${error.message}`);
       return this.ack(false, null, {
         code: error.status === 403 ? 'FORBIDDEN' : 'BAD_REQUEST',
         message: error.message,
@@ -409,30 +526,46 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         client.userId!,
       );
 
-      // Broadcast to all participants in the conversation room
-      this.server
-        .to(`conversation:${payload.conversationId}`)
-        .emit('message:created', {
-          _id: message._id.toString(),
-          sender_id: message.sender_id,
-          content: message.content,
-          attachments: message.attachments,
-          seen_by: message.seen_by,
-          created_at: message.created_at,
-          clientId: payload.clientId, // Echo back for client deduplication
-        });
+      // Broadcast to all participants in the conversation room AND to all participants' personal rooms
+      // This ensures conversation list updates for users who haven't opened the conversation yet
+      const roomName = `conversation:${payload.conversationId}`
+      this.logger.log(`Broadcasting message:created to room: ${roomName}`)
+
+      // Get conversation to find all participants
+      const conversation = await this.chatService.findConversationById(
+        payload.conversationId,
+      );
+
+      const messageData = {
+        _id: message._id.toString(),
+        sender_id: message.sender_id,
+        conversation_id: message.conversation_id.toString(),
+        content: message.content,
+        attachments: message.attachments,
+        seen_by: message.seen_by,
+        created_at: message.created_at,
+        clientId: payload.clientId, // Echo back for client deduplication
+      };
+
+      // Broadcast to conversation room (for users who have joined)
+      this.server.to(roomName).emit('message:created', messageData);
+
+      // Broadcast to all participants' personal rooms (for conversation list updates)
+      for (const participantId of conversation.participants) {
+        this.server.to(`user:${participantId}`).emit('message:created', messageData);
+      }
+
+      this.logger.log(`Message broadcasted: ${message._id} from user ${message.sender_id} to ${conversation.participants.length} participants`)
 
       // Send notifications to other participants (async, fire and forget)
       this.sendMessageNotifications(
         payload.conversationId,
         message.sender_id,
         message.content,
+        message.attachments,
       );
 
-      // Track message sent metric
-      const conversation = await this.chatService.findConversationById(
-        payload.conversationId,
-      );
+      // Track message sent metric (conversation already fetched above)
       this.metricsService.trackMessageSent(
         conversation.type === 'private' ? 'private' : 'group',
       );
@@ -845,8 +978,13 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     conversationId: string,
     senderId: number,
     content: string,
+    attachments?: string[],
   ): void {
     try {
+      this.logger.debug(
+        `[Notification] Starting to send notifications for conversation ${conversationId}, sender ${senderId}`,
+      );
+
       // Get conversation to find participants
       this.chatService
         .findConversationById(conversationId)
@@ -856,7 +994,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
             (id) => id !== senderId,
           );
 
+          this.logger.debug(
+            `[Notification] Found ${recipientIds.length} recipients: ${recipientIds.join(', ')}`,
+          );
+
           if (recipientIds.length === 0) {
+            this.logger.debug('[Notification] No recipients to notify');
             return; // No one to notify
           }
 
@@ -864,10 +1007,29 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
           const isGroup = conversation.participants.length > 2;
           const notificationTitle = isGroup
             ? `Tin nhắn mới trong nhóm "${conversation.name || 'Nhóm'}"`
-            : `Tin nhắn mới từ User ${senderId}`;
+            : `Tin nhắn mới`;
+
+          // Determine message type
+          let messageType: 'text' | 'image' | 'file' | 'system' = 'text';
+          if (attachments && attachments.length > 0) {
+            // Check if attachment is an image
+            if (attachments.some(a => a.match(/\.(jpg|jpeg|png|gif|webp)$/i))) {
+              messageType = 'image';
+            } else {
+              messageType = 'file';
+            }
+          }
+
+          this.logger.debug(
+            `[Notification] Notification title: ${notificationTitle}, type: ${messageType}`,
+          );
 
           // Emit event to RabbitMQ for each recipient
           for (const recipientId of recipientIds) {
+            this.logger.debug(
+              `[Notification] Emitting message.created event to RabbitMQ for user ${recipientId}`,
+            );
+
             this.notificationClient.emit('message.created', {
               user_id: recipientId,
               type: 'message',
@@ -875,19 +1037,29 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
               content: content.substring(0, 100), // Preview only
               related_id: conversationId,
               sender_id: senderId,
+              conversation_name: conversation.name || (isGroup ? 'Nhóm' : undefined),
+              message_type: messageType,
             });
+
+            this.logger.log(
+              `[Notification] ✅ Sent notification event to user ${recipientId}`,
+            );
           }
 
           this.logger.log(
-            `Sent notification events for message in conversation ${conversationId}`,
+            `[Notification] ✅ Sent ${recipientIds.length} notification events for conversation ${conversationId}`,
           );
         })
         .catch((err: any) => {
-          this.logger.error(`Failed to send notifications: ${err.message}`);
+          this.logger.error(
+            `[Notification] ❌ Failed to send notifications: ${err.message}`,
+          );
+          this.logger.error(`[Notification] Error stack: ${err.stack}`);
         });
     } catch (error) {
       // Don't throw - notification failure shouldn't break message sending
-      this.logger.error(`Notification error: ${error.message}`);
+      this.logger.error(`[Notification] ❌ Notification error: ${error.message}`);
+      this.logger.error(`[Notification] Error stack: ${error.stack}`);
     }
   }
 }

@@ -31,8 +31,10 @@ chat-backend/.env.production.local
 .env
 .env.local
 .env.production
+.env.docker
 frontend/.env
 frontend/.env.local
+frontend/.env.docker
 
 # Build output
 dist/

@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
+import { MessageType } from './schemas/message.schema';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import {
@@ -15,6 +16,7 @@ import {
   MessageDocument,
   MessageStatus,
 } from './schemas/message.schema';
+import { Nickname, NicknameDocument } from './schemas/nickname.schema';
 import {
   CreateConversationDto,
   SendMessageDto,
@@ -36,6 +38,8 @@ export class ChatService {
     private conversationModel: Model<ConversationDocument>,
     @InjectModel(Message.name)
     private messageModel: Model<MessageDocument>,
+    @InjectModel(Nickname.name)
+    private nicknameModel: Model<NicknameDocument>,
   ) {
     // Load pagination settings from environment variables
     this.defaultPageSize = parseInt(process.env.DEFAULT_PAGE_SIZE || '50', 10);
@@ -101,7 +105,8 @@ export class ChatService {
 
     return this.conversationModel
       .find({ participants: userId })
-      .sort({ created_at: -1 })
+      .populate('last_message_id')
+      .sort({ updated_at: -1 })
       .skip(skipCount)
       .limit(pageSize)
       .exec() as unknown as Promise<ConversationDocument[]>;
@@ -173,7 +178,9 @@ export class ChatService {
     conversationId: string,
     newUserId: number,
     currentUserId: number,
-  ): Promise<ConversationDocument> {
+    newUserName?: string,
+    actorName?: string,
+  ): Promise<{ conversation: ConversationDocument; systemMessage: MessageDocument | null }> {
     const conversation = await this.findConversationById(conversationId);
 
     if (!conversation.participants.includes(currentUserId)) {
@@ -193,14 +200,39 @@ export class ChatService {
     }
 
     conversation.participants.push(newUserId);
-    return conversation.save();
+    const savedConversation = await conversation.save();
+
+    // Create system message for member added - use username if provided
+    const userDisplayName = newUserName || `User ${newUserId}`;
+    const actorDisplayName = actorName || `User ${currentUserId}`;
+
+    // Check if adding self (shouldn't happen, but handle it)
+    const isSelfAdd = newUserId === currentUserId;
+    const messageContent = isSelfAdd
+      ? `${userDisplayName} đã gia nhập nhóm`
+      : `${userDisplayName} đã được thêm bởi ${actorDisplayName}`;
+
+    const systemMessage = await this.createSystemMessage(
+      conversationId,
+      messageContent,
+      {
+        event: 'member_added',
+        userId: newUserId,
+        actorId: currentUserId,
+        actorName: actorDisplayName,
+        targetName: userDisplayName,
+      },
+    );
+
+    return { conversation: savedConversation, systemMessage };
   }
 
   async removeMember(
     conversationId: string,
     userIdToRemove: number,
     currentUserId: number,
-  ): Promise<void> {
+    userNameToRemove?: string,
+  ): Promise<{ conversation: ConversationDocument; systemMessage: MessageDocument | null }> {
     const conversation = await this.findConversationById(conversationId);
 
     if (conversation.type === 'private') {
@@ -243,7 +275,24 @@ export class ChatService {
       );
     }
 
-    await conversation.save();
+    const savedConversation = await conversation.save();
+
+    // Create system message for member removed - use username if provided
+    const userDisplayName = userNameToRemove || `User ${userIdToRemove}`;
+    const isSelfRemove = currentUserId === userIdToRemove;
+    const systemMessage = await this.createSystemMessage(
+      conversationId,
+      isSelfRemove
+        ? `${userDisplayName} đã rời nhóm`
+        : `${userDisplayName} đã bị xóa khỏi nhóm`,
+      {
+        event: 'member_removed',
+        userId: userIdToRemove,
+        actorId: currentUserId,
+      },
+    );
+
+    return { conversation: savedConversation, systemMessage };
   }
 
   // ============ MESSAGES ============
@@ -291,7 +340,18 @@ export class ChatService {
       ],
     });
 
-    return message.save();
+    const savedMessage = await message.save();
+
+    // Update conversation with last_message_id
+    await this.conversationModel.findByIdAndUpdate(
+      conversationId,
+      {
+        last_message_id: savedMessage._id,
+        status: 'accepted', // Auto-accept pending conversations on first message
+      },
+    ).exec();
+
+    return savedMessage;
   }
 
   async getMessages(
@@ -300,7 +360,10 @@ export class ChatService {
     limit?: number,
     before?: Date,
   ): Promise<MessageDocument[]> {
+    console.log('[ChatService] getMessages called - conversationId:', conversationId, 'userId:', userId, 'limit:', limit);
+
     const conversation = await this.findConversationById(conversationId);
+    console.log('[ChatService] Conversation found:', conversation._id, 'participants:', conversation.participants);
 
     if (!conversation.participants.includes(userId)) {
       throw new ForbiddenException(
@@ -329,11 +392,16 @@ export class ChatService {
       query.created_at = { $lt: before };
     }
 
-    return this.messageModel
+    console.log('[ChatService] Executing MongoDB query:', JSON.stringify(query), 'pageSize:', pageSize);
+
+    const messages = await this.messageModel
       .find(query)
       .sort({ created_at: -1 })
       .limit(pageSize)
-      .exec() as Promise<MessageDocument[]>;
+      .exec() as unknown as MessageDocument[];
+
+    console.log('[ChatService] MongoDB returned messages count:', messages.length);
+    return messages;
   }
 
   async searchMessages(
@@ -945,6 +1013,116 @@ export class ChatService {
       .findById(conversationId)
       .exec();
     return conversation ? conversation.participants.includes(userId) : false;
+  }
+
+  // Helper: Create system message
+  private async createSystemMessage(
+    conversationId: string,
+    content: string,
+    systemData: {
+      event: 'member_added' | 'member_removed' | 'group_created' | 'group_deleted';
+      userId?: number;
+      actorId?: number;
+      actorName?: string;
+      targetName?: string;
+    },
+  ): Promise<MessageDocument> {
+    const message = new this.messageModel({
+      conversation_id: new Types.ObjectId(conversationId),
+      sender_id: 0, // System messages have sender_id = 0
+      content,
+      type: MessageType.SYSTEM,
+      system_data: systemData,
+      seen_by: [],  // System messages are not "seen" by anyone initially
+      status: MessageStatus.SENT,
+      delivery_info: [],
+    });
+
+    return message.save();
+  }
+
+  // ============ NICKNAMES ============
+
+  async setNickname(
+    conversationId: string,
+    ownerId: number,
+    targetUserId: number,
+    nickname: string,
+  ): Promise<NicknameDocument> {
+    // Validate inputs
+    if (!nickname || nickname.trim().length === 0) {
+      throw new BadRequestException('Nickname cannot be empty');
+    }
+    if (nickname.trim().length > 50) {
+      throw new BadRequestException('Nickname cannot exceed 50 characters');
+    }
+
+    // Verify conversation exists
+    const conversation = await this.findConversationById(conversationId);
+
+    // Verify both users are participants
+    if (!conversation.participants.includes(ownerId) || !conversation.participants.includes(targetUserId)) {
+      throw new ForbiddenException('Both users must be participants in this conversation');
+    }
+
+    // Upsert nickname
+    const existing = await this.nicknameModel.findOne({
+      conversation_id: new Types.ObjectId(conversationId),
+      owner_id: ownerId,
+      target_user_id: targetUserId,
+    });
+
+    if (existing) {
+      existing.nickname = nickname.trim();
+      return existing.save();
+    }
+
+    return this.nicknameModel.create({
+      conversation_id: new Types.ObjectId(conversationId),
+      owner_id: ownerId,
+      target_user_id: targetUserId,
+      nickname: nickname.trim(),
+    });
+  }
+
+  async removeNickname(
+    conversationId: string,
+    ownerId: number,
+    targetUserId: number,
+  ): Promise<void> {
+    const result = await this.nicknameModel.deleteOne({
+      conversation_id: new Types.ObjectId(conversationId),
+      owner_id: ownerId,
+      target_user_id: targetUserId,
+    });
+
+    if (result.deletedCount === 0) {
+      throw new NotFoundException('Nickname not found');
+    }
+  }
+
+  async getNicknames(
+    conversationId: string,
+    ownerId: number,
+  ): Promise<NicknameDocument[]> {
+    return this.nicknameModel.find({
+      conversation_id: new Types.ObjectId(conversationId),
+      owner_id: ownerId,
+    });
+  }
+
+  async getNickname(
+    conversationId: string,
+    ownerId: number,
+    targetUserId: number,
+  ): Promise<string | null> {
+    const nickname = await this.nicknameModel.findOne({
+      conversation_id: new Types.ObjectId(conversationId),
+      owner_id: ownerId,
+      target_user_id: targetUserId,
+    });
+
+    return nickname ? nickname.nickname : null;
   }
 
   // Helper: Check if user is admin or moderator

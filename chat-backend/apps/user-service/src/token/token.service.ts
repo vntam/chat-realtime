@@ -15,17 +15,18 @@ export class TokensService {
   async generateTokens(userId: number) {
     const payload = { sub: userId };
 
+    // Access token expires in 30 days (longer for better UX)
     const accessToken = await this.jwt.signAsync(payload, {
       secret: process.env.JWT_ACCESS_SECRET,
-      expiresIn: '15m',
+      expiresIn: '30d',
     });
 
     const refreshToken = await this.jwt.signAsync(payload, {
       secret: process.env.JWT_REFRESH_SECRET,
-      expiresIn: '7d',
+      expiresIn: '30d',
     });
 
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
     return { accessToken, refreshToken, expiresAt };
   }

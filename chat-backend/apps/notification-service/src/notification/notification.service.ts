@@ -57,6 +57,11 @@ export class NotificationService {
     title: string;
     content: string;
     related_id?: string;
+    sender_id?: number;
+    sender_name?: string;
+    sender_avatar?: string;
+    conversation_name?: string;
+    message_type?: 'text' | 'image' | 'file' | 'system';
   }): Promise<NotificationDocument> {
     const notification = new this.notificationModel(data);
     return notification.save();

@@ -27,24 +27,25 @@
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    /* Facebook-like dark mode colors - not pure black */
+    --background: 220 15% 12%; /* #1c1e21 - Facebook dark background */
+    --foreground: 220 10% 95%; /* #e4e6eb */
+    --card: 220 15% 15%; /* #242526 - Facebook card background */
+    --card-foreground: 220 10% 95%;
+    --popover: 220 15% 15%;
+    --popover-foreground: 220 10% 95%;
     --primary: 221 83% 53%;
     --primary-foreground: 210 40% 98%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --secondary: 220 12% 20%; /* #2f3036 */
+    --secondary-foreground: 220 10% 95%;
+    --muted: 220 12% 20%;
+    --muted-foreground: 215 10% 65%; /* #b0b3b8 */
+    --accent: 220 12% 20%;
+    --accent-foreground: 220 10% 95%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
+    --border: 220 13% 18%; /* #3a3b3c - Facebook border */
+    --input: 220 13% 18%;
     --ring: 221 83% 53%;
   }
 }
@@ -86,6 +87,10 @@
     -webkit-backdrop-filter: blur(10px);
   }
 
+  .dark .glass {
+    background: rgba(36, 37, 38, 0.8);
+  }
+
   /* Gradient text */
   .gradient-text {
     background: linear-gradient(135deg, hsl(var(--primary)), hsl(221, 70%, 60%));
@@ -97,6 +102,38 @@
   /* Smooth transitions */
   .transition-smooth {
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Toast slide-in animation */
+  @keyframes slide-in-right {
+    from {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+
+  .animate-slide-in-right {
+    animation: slide-in-right 0.3s ease-out;
+  }
+
+  /* Notification badge pulse */
+  @keyframes notification-pulse {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: scale(1.05);
+      opacity: 0.9;
+    }
+  }
+
+  .animate-notification-pulse {
+    animation: notification-pulse 2s ease-in-out infinite;
   }
 
   /* Message animations */

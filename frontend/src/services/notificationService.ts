@@ -1,14 +1,15 @@
 import axios from 'axios'
 
 const notificationAPI = axios.create({
-  baseURL: import.meta.env.VITE_NOTIFICATION_SERVICE_URL || 'http://localhost:3003',
+  baseURL: import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:3000',
   timeout: 10000,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
 })
 
-// Add access token from sessionStorage (cross-port solution)
+// Add token to Authorization header
 notificationAPI.interceptors.request.use((config) => {
   const token = sessionStorage.getItem('access_token')
   if (token) {
@@ -25,6 +26,12 @@ export interface Notification {
   title: string
   content: string
   related_id?: string
+  // Enhanced notification fields
+  sender_id?: number
+  sender_name?: string
+  sender_avatar?: string
+  conversation_name?: string
+  message_type?: 'text' | 'image' | 'file' | 'system'
   data?: {
     conversationId?: string
     messageId?: string

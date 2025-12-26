@@ -12,6 +12,8 @@ import {
   Query,
   ForbiddenException,
   ParseIntPipe,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { UsersService } from './user.service';
 
@@ -20,6 +22,7 @@ import {
   UpdateUserDto,
   UserQueryDto,
   PublicUserResponseDto,
+  ChangePasswordDto,
 } from '@app/contracts';
 import { GetCurrentUser, Roles, RolesGuard } from '@app/common';
 import { JwtGuard } from '../auth/guards/jwt/jwt.guard';
@@ -42,10 +45,15 @@ export class UsersController {
 
   @Post('batch')
   async findByIds(@Body() body: { ids: number[] }): Promise<PublicUserResponseDto[]> {
+    console.log('[UsersController] findByIds called with body:', JSON.stringify(body));
     if (!Array.isArray(body.ids) || body.ids.length === 0) {
+      console.log('[UsersController] No valid IDs provided, returning empty array');
       return [];
     }
-    return this.usersService.findByIds(body.ids);
+    console.log('[UsersController] Fetching users for IDs:', body.ids);
+    const users = await this.usersService.findByIds(body.ids);
+    console.log('[UsersController] Found users:', users.length);
+    return users;
   }
 
   /**
@@ -94,6 +102,18 @@ export class UsersController {
       );
     }
     return this.usersService.deleteUser(id);
+  }
+
+  // Password change
+  @UseGuards(JwtGuard)
+  @Post('change-password')
+  @HttpCode(HttpStatus.OK)
+  async changePassword(
+    @Body() dto: ChangePasswordDto,
+    @GetCurrentUser('sub') userId: number,
+  ) {
+    console.log('[UsersController] changePassword called for user:', userId);
+    return await this.usersService.changePassword(userId, dto.oldPassword, dto.newPassword);
   }
 
   // roles
