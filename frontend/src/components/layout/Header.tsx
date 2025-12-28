@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { LogOut, Settings, MessageSquare, Moon, Sun } from 'lucide-react'
+import { LogOut, Settings, MessageSquare, Moon, Sun, Monitor } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { useThemeStore } from '@/store/themeStore'
 import NotificationDropdown from '@/components/notification/NotificationDropdown'
@@ -9,16 +9,24 @@ import Avatar from '@/components/ui/Avatar'
 export default function Header() {
   const navigate = useNavigate()
   const { user, logout } = useAuthStore()
-  const { theme, toggleTheme } = useThemeStore()
+  const { theme, effectiveTheme, setTheme } = useThemeStore()
   const [showUserMenu, setShowUserMenu] = useState(false)
+  const [showThemeMenu, setShowThemeMenu] = useState(false)
 
   const handleLogout = () => {
     logout()
     navigate('/login')
   }
 
+  const getThemeIcon = () => {
+    if (effectiveTheme === 'dark') {
+      return <Sun className="w-5 h-5 text-yellow-500" />
+    }
+    return <Moon className="w-5 h-5 text-gray-600" />
+  }
+
   return (
-    <header className="h-16 bg-white dark:bg-[#242526] backdrop-blur-xl border-b border-gray-200 dark:border-[#3a3b3c] px-6 flex items-center justify-between shadow-sm sticky top-0 z-30 transition-colors duration-200">
+    <header className="h-16 bg-white dark:bg-[#242526] backdrop-blur-xl border-b border-gray-200 dark:border-[#3a3b3c] px-6 flex items-center justify-between shadow-sm sticky top-0 z-30 transition-colors duration-300">
       {/* App Title */}
       <div className="flex items-center gap-3">
         <div className="relative">
@@ -32,18 +40,78 @@ export default function Header() {
 
       {/* Right Actions */}
       <div className="flex items-center gap-3">
-        {/* Theme Toggle */}
-        <button
-          onClick={toggleTheme}
-          className="p-2.5 rounded-xl hover:bg-gray-100 dark:hover:bg-[#3a3b3c] transition-colors duration-200 group"
-          title={theme === 'dark' ? 'Chế độ sáng' : 'Chế độ tối'}
-        >
-          {theme === 'dark' ? (
-            <Sun className="w-5 h-5 text-yellow-500 group-hover:scale-110 transition-transform" />
-          ) : (
-            <Moon className="w-5 h-5 text-gray-600 group-hover:scale-110 transition-transform" />
+        {/* Theme Toggle - Facebook style dropdown */}
+        <div className="relative">
+          <button
+            onClick={() => setShowThemeMenu(!showThemeMenu)}
+            className="p-2.5 rounded-xl hover:bg-gray-100 dark:hover:bg-[#3a3b3c] transition-colors duration-200 group"
+            title="Chuyển chế độ sáng/tối"
+          >
+            {getThemeIcon()}
+          </button>
+
+          {/* Theme Dropdown Menu */}
+          {showThemeMenu && (
+            <>
+              {/* Backdrop */}
+              <div
+                className="fixed inset-0 z-10"
+                onClick={() => setShowThemeMenu(false)}
+              />
+              {/* Menu */}
+              <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-[#242526] border border-gray-200 dark:border-[#3a3b3c] rounded-xl shadow-xl z-20 overflow-hidden animate-fade-in">
+                <p className="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-[#b0b3b8] uppercase tracking-wide">
+                  Giao diện
+                </p>
+                <button
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm hover:bg-gray-100 dark:hover:bg-[#3a3b3c] transition-smooth ${
+                    theme === 'light' ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                  }`}
+                  onClick={() => {
+                    setTheme('light')
+                    setShowThemeMenu(false)
+                  }}
+                >
+                  <Sun className="w-4 h-4 text-gray-600 dark:text-[#e4e6eb]" />
+                  <span className="text-gray-700 dark:text-[#e4e6eb] font-medium">Sáng</span>
+                  {theme === 'light' && (
+                    <div className="ml-auto w-2 h-2 rounded-full bg-blue-500" />
+                  )}
+                </button>
+                <button
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm hover:bg-gray-100 dark:hover:bg-[#3a3b3c] transition-smooth ${
+                    theme === 'dark' ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                  }`}
+                  onClick={() => {
+                    setTheme('dark')
+                    setShowThemeMenu(false)
+                  }}
+                >
+                  <Moon className="w-4 h-4 text-gray-600 dark:text-[#e4e6eb]" />
+                  <span className="text-gray-700 dark:text-[#e4e6eb] font-medium">Tối</span>
+                  {theme === 'dark' && (
+                    <div className="ml-auto w-2 h-2 rounded-full bg-blue-500" />
+                  )}
+                </button>
+                <button
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm hover:bg-gray-100 dark:hover:bg-[#3a3b3c] transition-smooth ${
+                    theme === 'system' ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                  }`}
+                  onClick={() => {
+                    setTheme('system')
+                    setShowThemeMenu(false)
+                  }}
+                >
+                  <Monitor className="w-4 h-4 text-gray-600 dark:text-[#e4e6eb]" />
+                  <span className="text-gray-700 dark:text-[#e4e6eb] font-medium">Theo hệ thống</span>
+                  {theme === 'system' && (
+                    <div className="ml-auto w-2 h-2 rounded-full bg-blue-500" />
+                  )}
+                </button>
+              </div>
+            </>
           )}
-        </button>
+        </div>
 
         {/* Notification Dropdown */}
         <NotificationDropdown />

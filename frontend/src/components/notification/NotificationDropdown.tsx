@@ -163,9 +163,9 @@ export default function NotificationDropdown() {
       {/* Bell Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2.5 hover:bg-gray-100 rounded-xl transition-smooth group"
+        className="relative p-2.5 hover:bg-gray-100 dark:hover:bg-[#3a3b3c] rounded-xl transition-smooth group"
       >
-        <Bell className="w-5 h-5 text-gray-700 group-hover:text-blue-600 transition-smooth" />
+        <Bell className="w-5 h-5 text-gray-700 dark:text-[#e4e6eb] group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-smooth" />
         {unreadCount > 0 && (
           <span className="absolute -top-1 -right-1 min-w-[20px] h-[20px] bg-gradient-to-br from-red-500 to-red-600 text-white text-xs font-bold rounded-full flex items-center justify-center px-1 shadow-lg animate-notification-pulse">
             {unreadCount > 99 ? '99+' : unreadCount}
@@ -180,10 +180,10 @@ export default function NotificationDropdown() {
           <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
 
           {/* Dropdown Panel */}
-          <div className="absolute right-0 mt-2 w-96 bg-card border border-border rounded-lg shadow-lg z-20 max-h-[600px] flex flex-col">
+          <div className="absolute right-0 mt-2 w-96 bg-white dark:bg-[#242526] border border-gray-200 dark:border-[#3a3b3c] rounded-lg shadow-lg z-20 max-h-[600px] flex flex-col">
             {/* Header */}
-            <div className="p-4 border-b border-border flex items-center justify-between">
-              <h3 className="font-semibold text-lg">Thông báo</h3>
+            <div className="p-4 border-b border-gray-200 dark:border-[#3a3b3c] flex items-center justify-between">
+              <h3 className="font-semibold text-lg text-gray-900 dark:text-[#e4e6eb]">Thông báo</h3>
               <div className="flex items-center gap-2">
                 {unreadCount > 0 && (
                   <Button
@@ -198,9 +198,9 @@ export default function NotificationDropdown() {
                 )}
                 <button
                   onClick={() => setIsOpen(false)}
-                  className="p-1 hover:bg-accent rounded transition-colors"
+                  className="p-1 hover:bg-gray-100 dark:hover:bg-[#3a3b3c] rounded transition-colors"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-4 h-4 text-gray-500 dark:text-[#b0b3b8]" />
                 </button>
               </div>
             </div>
@@ -208,13 +208,13 @@ export default function NotificationDropdown() {
             {/* Notification List */}
             <div className="flex-1 overflow-y-auto">
               {isLoading ? (
-                <div className="p-8 text-center text-sm text-muted-foreground">
+                <div className="p-8 text-center text-sm text-gray-500 dark:text-[#b0b3b8]">
                   Đang tải...
                 </div>
               ) : notifications.length === 0 ? (
                 <div className="p-8 text-center">
-                  <Bell className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-50" />
-                  <p className="text-sm text-muted-foreground">
+                  <Bell className="w-12 h-12 mx-auto mb-3 text-gray-400 dark:text-[#b0b3b8] opacity-50" />
+                  <p className="text-sm text-gray-500 dark:text-[#b0b3b8]">
                     Chưa có thông báo nào
                   </p>
                 </div>
@@ -225,8 +225,8 @@ export default function NotificationDropdown() {
                   return (
                   <div
                     key={notification.id}
-                    className={`p-4 border-b border-gray-200 last:border-b-0 hover:bg-gray-50 transition-smooth cursor-pointer animate-fade-in ${
-                      !isRead ? 'bg-blue-50' : ''
+                    className={`p-4 border-b border-gray-200 dark:border-[#3a3b3c] last:border-b-0 hover:bg-gray-50 dark:hover:bg-[#1c1e21] transition-smooth cursor-pointer animate-fade-in ${
+                      !isRead ? 'bg-blue-50 dark:bg-blue-900/20' : ''
                     }`}
                   >
                     <div className="flex items-start gap-3">
@@ -236,7 +236,7 @@ export default function NotificationDropdown() {
                           src={notification.sender_avatar}
                           username={notification.sender_name}
                           size="lg"
-                          className="border-2 border-white shadow-sm"
+                          className="border-2 border-white dark:border-[#3a3b3c] shadow-sm"
                         />
                       </div>
 
@@ -245,12 +245,12 @@ export default function NotificationDropdown() {
                         <div className="flex items-start justify-between gap-2 mb-1">
                           <div className="flex items-center gap-2">
                             {notification.sender_name && (
-                              <span className="font-semibold text-sm text-gray-900">
+                              <span className="font-semibold text-sm text-gray-900 dark:text-[#e4e6eb]">
                                 {notification.sender_name}
                               </span>
                             )}
                             {notification.conversation_name && notification.type === 'message' && (
-                              <span className="text-xs text-gray-500">
+                              <span className="text-xs text-gray-500 dark:text-[#b0b3b8]">
                                 trong <span className="font-medium">{notification.conversation_name}</span>
                               </span>
                             )}
@@ -261,12 +261,12 @@ export default function NotificationDropdown() {
                         </div>
                         <div className="flex items-center gap-2 mb-2">
                           {getNotificationIcon(notification.type, notification.message_type)}
-                          <p className="text-sm text-gray-700 line-clamp-2 flex-1">
+                          <p className="text-sm text-gray-700 dark:text-gray-300 line-clamp-2 flex-1">
                             {notification.content}
                           </p>
                         </div>
                         <div className="flex items-center justify-between">
-                          <span className="text-xs text-gray-500 font-medium">
+                          <span className="text-xs text-gray-500 dark:text-[#b0b3b8] font-medium">
                             {formatTime(createdAt)}
                           </span>
                           <div className="flex items-center gap-1">
@@ -276,10 +276,10 @@ export default function NotificationDropdown() {
                                   e.stopPropagation()
                                   handleMarkAsRead(notification.id)
                                 }}
-                                className="p-1.5 hover:bg-blue-100 rounded-lg transition-smooth"
+                                className="p-1.5 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition-smooth"
                                 title="Đánh dấu đã đọc"
                               >
-                                <Check className="w-4 h-4 text-blue-600" />
+                                <Check className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                               </button>
                             )}
                             <button
@@ -287,10 +287,10 @@ export default function NotificationDropdown() {
                                 e.stopPropagation()
                                 handleDelete(notification.id)
                               }}
-                              className="p-1.5 hover:bg-red-100 rounded-lg transition-smooth"
+                              className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-smooth"
                               title="Xóa"
                             >
-                              <Trash2 className="w-4 h-4 text-gray-500 hover:text-red-600" />
+                              <Trash2 className="w-4 h-4 text-gray-500 dark:text-[#b0b3b8] hover:text-red-600 dark:hover:text-red-400" />
                             </button>
                           </div>
                         </div>

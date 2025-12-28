@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef } from 'react'
 import type { FormEvent } from 'react'
-import { Send, ThumbsUp, Smile } from 'lucide-react'
+import { Send, ThumbsUp, Smile, Image } from 'lucide-react'
 import { getSocket } from '@/lib/socket'
 import { useAuthStore } from '@/store/authStore'
 import { useChatStore } from '@/store/chatStore'
+import { chatService } from '@/services/chatService'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import StickerPicker from './StickerPicker'
+import EmojiPicker from './EmojiPicker'
 
 export default function ChatInput() {
   const { user } = useAuthStore()
@@ -14,8 +16,12 @@ export default function ChatInput() {
   const [message, setMessage] = useState('')
   const [isSending, setIsSending] = useState(false)
   const [showStickerPicker, setShowStickerPicker] = useState(false)
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
   const typingTimeoutRef = useRef<number | null>(null)
   const stickerButtonRef = useRef<HTMLButtonElement>(null)
+  const emojiButtonRef = useRef<HTMLButtonElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Handle typing indicator
   useEffect(() => {
@@ -152,21 +158,113 @@ export default function ChatInput() {
     }, 0)
   }
 
+  const handleEmojiSelect = (emoji: string) => {
+    setMessage((prev) => prev + emoji)
+    // Keep emoji picker open for more selections
+  }
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !selectedConversation) return
+
+    setIsUploading(true)
+    try {
+      // Upload file using chatService
+      const uploadResult = await chatService.uploadFile(file)
+
+      // Send message with uploaded file URL
+      const socket = getSocket()
+      if (!socket || !socket.connected) {
+        alert('Mất kết nối WebSocket')
+        setIsUploading(false)
+        return
+      }
+
+      const messageContent = uploadResult.url // Send the file URL as message content
+      const clientId = `file-${Date.now()}-${Math.random()}`
+
+      socket.emit(
+        'message:send',
+        {
+          conversationId: selectedConversation.id,
+          content: messageContent,
+          clientId,
+        },
+        (response: any) => {
+          if (!response || !response.ok) {
+            console.error('Failed to send file message:', response?.error)
+            alert('Không thể gửi tin nhắn')
+            setIsUploading(false)
+            return
+          }
+
+          const optimisticMessage = {
+            id: response.data._id || response.data.id,
+            conversationId: selectedConversation.id,
+            senderId: String(user!.user_id),
+            content: messageContent,
+            sender: {
+              id: String(user!.user_id),
+              name: user!.username,
+              email: user!.email,
+            },
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          }
+
+          addMessage(optimisticMessage)
+          updateConversationLastMessage(selectedConversation.id, optimisticMessage)
+          setIsUploading(false)
+        }
+      )
+    } catch (error) {
+      console.error('Error uploading file:', error)
+      alert('Không thể upload file. Vui lòng thử lại.')
+      setIsUploading(false)
+    }
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
   const hasContent = message.trim().length > 0
 
   return (
     <div className="p-4 bg-white dark:bg-[#242526] border-t border-gray-200 dark:border-[#3a3b3c] relative z-50">
-      <form onSubmit={hasContent ? handleSubmit : handleLikeSubmit} className="flex gap-3 items-end relative">
-        {/* Sticker Button */}
+      <form onSubmit={hasContent ? handleSubmit : handleLikeSubmit} className="flex gap-2 items-end relative">
+        {/* Emoji Picker Button - inserts emoji into text */}
+        <div className="relative">
+          <button
+            ref={emojiButtonRef}
+            type="button"
+            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+            className="p-2.5 rounded-xl hover:bg-gray-100 dark:hover:bg-[#3a3b3c] text-gray-500 dark:text-[#b0b3b8] transition-colors"
+            title="Emoji"
+          >
+            <Smile className="w-5 h-5" />
+          </button>
+
+          {showEmojiPicker && (
+            <EmojiPicker
+              onClose={() => setShowEmojiPicker(false)}
+              onSelect={handleEmojiSelect}
+              triggerRef={emojiButtonRef}
+            />
+          )}
+        </div>
+
+        {/* Sticker Button - sends sticker directly */}
         <div className="relative">
           <button
             ref={stickerButtonRef}
             type="button"
             onClick={() => setShowStickerPicker(!showStickerPicker)}
-            className="p-3 rounded-xl hover:bg-gray-100 dark:hover:bg-[#3a3b3c] text-gray-500 dark:text-[#b0b3b8] transition-colors"
+            className="p-2.5 rounded-xl hover:bg-gray-100 dark:hover:bg-[#3a3b3c] text-gray-500 dark:text-[#b0b3b8] transition-colors"
             title="Sticker"
           >
-            <Smile className="w-5 h-5" />
+            😊
           </button>
 
           {showStickerPicker && (
@@ -175,6 +273,30 @@ export default function ChatInput() {
               triggerRef={stickerButtonRef}
             />
           )}
+        </div>
+
+        {/* Image/File Upload Button */}
+        <div className="relative">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
+            onChange={handleFileUpload}
+            className="hidden"
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
+            className="p-2.5 rounded-xl hover:bg-gray-100 dark:hover:bg-[#3a3b3c] text-gray-500 dark:text-[#b0b3b8] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Tải ảnh/file lên"
+          >
+            {isUploading ? (
+              <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <Image className="w-5 h-5" />
+            )}
+          </button>
         </div>
 
         <div className="flex-1">
@@ -189,8 +311,8 @@ export default function ChatInput() {
         </div>
         <Button
           type="submit"
-          disabled={isSending}
-          className={`flex-shrink-0 px-6 py-3 rounded-xl shadow-lg transition-smooth disabled:opacity-50 disabled:cursor-not-allowed ${
+          disabled={isSending || isUploading}
+          className={`flex-shrink-0 px-5 py-3 rounded-xl shadow-lg transition-smooth disabled:opacity-50 disabled:cursor-not-allowed ${
             hasContent
               ? 'bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-blue-500/30'
               : 'bg-gray-100 dark:bg-[#3a3b3c] hover:bg-gray-200 dark:hover:bg-[#4e4f50] text-gray-600 dark:text-[#e4e6eb] border border-gray-300 dark:border-[#3a3b3c]'

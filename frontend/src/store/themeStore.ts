@@ -1,59 +1,100 @@
 import { create } from 'zustand'
 
-type Theme = 'light' | 'dark'
+type Theme = 'light' | 'dark' | 'system'
 
 interface ThemeState {
   theme: Theme
+  effectiveTheme: 'light' | 'dark'
   setTheme: (theme: Theme) => void
   toggleTheme: () => void
 }
 
-// Get initial theme from localStorage or default to light
-const getInitialTheme = (): Theme => {
+// Get system theme preference
+const getSystemTheme = (): 'light' | 'dark' => {
   if (typeof window === 'undefined') return 'light'
+  return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+}
+
+// Get initial theme from localStorage or default to LIGHT (not system)
+// This ensures new users always get light mode first
+const getInitialTheme = (): { theme: Theme; effectiveTheme: 'light' | 'dark' } => {
+  if (typeof window === 'undefined') return { theme: 'light', effectiveTheme: 'light' }
+
   const saved = localStorage.getItem('theme') as Theme | null
-  if (saved === 'light' || saved === 'dark') return saved
+  const theme: Theme = saved === 'light' || saved === 'dark' || saved === 'system' ? saved : 'light'
 
-  // Check system preference
-  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    return 'dark'
-  }
+  const effectiveTheme: 'light' | 'dark' = theme === 'system' ? getSystemTheme() : theme
 
-  return 'light'
+  return { theme, effectiveTheme }
 }
 
 // Initialize theme immediately
-const initialTheme = getInitialTheme()
+const { theme: initialTheme, effectiveTheme: initialEffectiveTheme } = getInitialTheme()
 if (typeof window !== 'undefined') {
   document.documentElement.classList.remove('light', 'dark')
-  document.documentElement.classList.add(initialTheme)
-  document.documentElement.setAttribute('data-theme', initialTheme)
+  document.documentElement.classList.add(initialEffectiveTheme)
+  document.documentElement.setAttribute('data-theme', initialEffectiveTheme)
+
+  // Add transition class after a small delay for smooth initial load
+  setTimeout(() => {
+    document.documentElement.classList.add('theme-transition-enabled')
+  }, 100)
 }
 
-export const useThemeStore = create<ThemeState>((set) => ({
-  theme: initialTheme,
-
-  setTheme: (theme: Theme) => {
-    set({ theme })
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('theme', theme)
-      // Apply theme to document
+// Listen for system theme changes
+if (typeof window !== 'undefined') {
+  const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+  const handleSystemThemeChange = (e: MediaQueryListEvent | MediaQueryList) => {
+    const storedTheme = localStorage.getItem('theme') as Theme
+    // Only apply system theme changes if user explicitly set 'system' mode
+    if (storedTheme === 'system') {
+      const newEffectiveTheme = e.matches ? 'dark' : 'light'
       document.documentElement.classList.remove('light', 'dark')
-      document.documentElement.classList.add(theme)
-      document.documentElement.setAttribute('data-theme', theme)
+      document.documentElement.classList.add(newEffectiveTheme)
+      document.documentElement.setAttribute('data-theme', newEffectiveTheme)
+    }
+  }
+
+  // Modern browsers
+  if (mediaQuery.addEventListener) {
+    mediaQuery.addEventListener('change', handleSystemThemeChange)
+  } else {
+    // Older browsers
+    mediaQuery.addListener(handleSystemThemeChange)
+  }
+}
+
+export const useThemeStore = create<ThemeState>((set, get) => ({
+  theme: initialTheme,
+  effectiveTheme: initialEffectiveTheme,
+
+  setTheme: (newTheme: Theme) => {
+    const effectiveTheme: 'light' | 'dark' = newTheme === 'system' ? getSystemTheme() : newTheme
+
+    set({ theme: newTheme, effectiveTheme })
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('theme', newTheme)
+      // Apply theme to document with smooth transition
+      document.documentElement.classList.remove('light', 'dark')
+      document.documentElement.classList.add(effectiveTheme)
+      document.documentElement.setAttribute('data-theme', effectiveTheme)
     }
   },
 
   toggleTheme: () => {
-    set((state) => {
-      const newTheme: Theme = state.theme === 'light' ? 'dark' : 'light'
+    const { effectiveTheme: currentEffective } = get()
+    const newEffective: 'light' | 'dark' = currentEffective === 'light' ? 'dark' : 'light'
+
+    set(() => {
+      const newTheme: Theme = newEffective
       if (typeof window !== 'undefined') {
         localStorage.setItem('theme', newTheme)
         document.documentElement.classList.remove('light', 'dark')
-        document.documentElement.classList.add(newTheme)
-        document.documentElement.setAttribute('data-theme', newTheme)
+        document.documentElement.classList.add(newEffective)
+        document.documentElement.setAttribute('data-theme', newEffective)
       }
-      return { theme: newTheme }
+      return { theme: newTheme, effectiveTheme: newEffective }
     })
   },
 }))

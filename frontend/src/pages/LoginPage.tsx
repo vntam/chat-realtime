@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -22,6 +22,23 @@ export default function LoginPage() {
     username: '',
     confirmPassword: '',
   })
+
+  // Force light mode for login/register page
+  useEffect(() => {
+    document.documentElement.classList.remove('dark')
+    document.documentElement.classList.add('light')
+    document.documentElement.setAttribute('data-theme', 'light')
+
+    // Cleanup: restore theme when leaving the page
+    return () => {
+      const savedTheme = localStorage.getItem('theme')
+      if (savedTheme === 'dark') {
+        document.documentElement.classList.remove('light')
+        document.documentElement.classList.add('dark')
+        document.documentElement.setAttribute('data-theme', 'dark')
+      }
+    }
+  }, [])
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -92,10 +109,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Gradient Background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50" />
-      
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
       {/* Animated gradient orbs */}
       <div className="absolute top-0 left-0 w-96 h-96 bg-gradient-to-br from-blue-400/30 to-indigo-400/30 rounded-full blur-3xl animate-pulse" />
       <div className="absolute bottom-0 right-0 w-96 h-96 bg-gradient-to-br from-purple-400/30 to-pink-400/30 rounded-full blur-3xl animate-pulse delay-1000" />
@@ -110,10 +124,10 @@ export default function LoginPage() {
               </div>
             </div>
           </div>
-          <CardTitle className="text-3xl text-center font-bold gradient-text">
+          <CardTitle className="text-3xl text-center font-bold gradient-text text-gray-900">
             {isLogin ? 'Chat Message' : 'Tạo tài khoản'}
           </CardTitle>
-          <CardDescription className="text-center text-base pt-2">
+          <CardDescription className="text-center text-base pt-2 text-gray-600">
             {isLogin
               ? 'Đăng nhập để tiếp tục trò chuyện với bạn bè'
               : 'Tạo tài khoản mới để bắt đầu kết nối'}
@@ -123,7 +137,7 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Error message */}
             {error && (
-              <div className="flex items-center gap-2 p-3 bg-destructive/10 text-destructive rounded-md text-sm">
+              <div className="flex items-center gap-2 p-3 bg-red-50 text-red-600 rounded-md text-sm border border-red-200">
                 <AlertCircle className="w-4 h-4" />
                 <span>{error}</span>
               </div>
@@ -132,7 +146,7 @@ export default function LoginPage() {
             {/* Username field - only for register */}
             {!isLogin && (
               <div className="space-y-2">
-                <Label htmlFor="username">Tên đăng nhập</Label>
+                <Label htmlFor="username" className="text-gray-700">Tên đăng nhập</Label>
                 <Input
                   id="username"
                   name="username"
@@ -148,7 +162,7 @@ export default function LoginPage() {
 
             {/* Email field */}
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="text-gray-700">Email</Label>
               <Input
                 id="email"
                 name="email"
@@ -163,7 +177,7 @@ export default function LoginPage() {
 
             {/* Password field */}
             <div className="space-y-2">
-              <Label htmlFor="password">Mật khẩu</Label>
+              <Label htmlFor="password" className="text-gray-700">Mật khẩu</Label>
               <Input
                 id="password"
                 name="password"
@@ -179,7 +193,7 @@ export default function LoginPage() {
             {/* Confirm Password - only for register */}
             {!isLogin && (
               <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Xác nhận mật khẩu</Label>
+                <Label htmlFor="confirmPassword" className="text-gray-700">Xác nhận mật khẩu</Label>
                 <Input
                   id="confirmPassword"
                   name="confirmPassword"
@@ -200,13 +214,13 @@ export default function LoginPage() {
 
             {/* Toggle between login and register */}
             <div className="text-center text-sm">
-              <span className="text-muted-foreground">
+              <span className="text-gray-600">
                 {isLogin ? 'Chưa có tài khoản?' : 'Đã có tài khoản?'}{' '}
               </span>
               <button
                 type="button"
                 onClick={toggleMode}
-                className="text-primary hover:underline font-medium"
+                className="text-blue-600 hover:underline font-medium"
                 disabled={isLoading}
               >
                 {isLogin ? 'Đăng ký ngay' : 'Đăng nhập'}

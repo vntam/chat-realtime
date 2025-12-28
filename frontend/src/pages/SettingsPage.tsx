@@ -180,23 +180,35 @@ export default function SettingsPage() {
     setSuccessMessage('')
 
     try {
+      console.log('[SettingsPage] handleSubmit called, user:', user)
+      console.log('[SettingsPage] formData:', formData)
+      console.log('[SettingsPage] avatarFile:', avatarFile)
+
       let avatarUrl: string | undefined = user?.avatar_url
 
       // Upload avatar if a new file was selected
       if (avatarFile) {
+        console.log('[SettingsPage] Uploading new avatar...')
         const uploadResult = await userService.uploadAvatar(avatarFile)
         avatarUrl = uploadResult.url
+        console.log('[SettingsPage] Avatar uploaded, URL:', avatarUrl)
       } else if (previewAvatar === null && user?.avatar_url) {
         // User removed the avatar (preview is null but user had avatar before)
         avatarUrl = undefined
+        console.log('[SettingsPage] Avatar removed by user')
       }
 
-      // Update user profile with new avatar URL
-      await userService.updateUser(user!.user_id, {
+      // Prepare update data
+      const updateData = {
         username: formData.username.trim(),
         email: formData.email.trim(),
         avatar_url: avatarUrl,
-      })
+      }
+      console.log('[SettingsPage] Calling updateUser with:', user!.user_id, updateData)
+
+      // Update user profile with new avatar URL
+      const result = await userService.updateUser(user!.user_id, updateData)
+      console.log('[SettingsPage] updateUser result:', result)
 
       // Refresh user data from backend to get latest values
       await refreshUser()
@@ -206,8 +218,12 @@ export default function SettingsPage() {
       setAvatarFile(null)
       setPreviewAvatar(null)
     } catch (error: any) {
-      console.error('Failed to update profile:', error)
-      const errorMsg = error.response?.data?.message || 'Không thể cập nhật thông tin. Vui lòng thử lại.'
+      console.error('[SettingsPage] Failed to update profile:', error)
+      console.error('[SettingsPage] Error response:', error.response)
+      console.error('[SettingsPage] Error data:', error.response?.data)
+      console.error('[SettingsPage] Error status:', error.response?.status)
+
+      const errorMsg = error.response?.data?.message || error.message || 'Không thể cập nhật thông tin. Vui lòng thử lại.'
       setErrors({ submit: errorMsg })
     } finally {
       setIsSaving(false)

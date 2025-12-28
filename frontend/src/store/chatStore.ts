@@ -22,6 +22,9 @@ interface ChatState {
   selectConversation: (conversation: Conversation | null) => void
   setMessages: (messages: Message[]) => void
   addMessage: (message: Message) => void
+  updateMessage: (messageId: string, updates: Partial<Message>) => void
+  loadMessagesFromStorage: (conversationId: string | undefined) => Message[]
+  clearMessages: () => void
   updateConversationLastMessage: (conversationId: string, message: Message) => void
   setTypingUser: (conversationId: string, userId: number, userName: string, isTyping: boolean) => void
   getTypingUsers: (conversationId: string) => TypingUser[]
@@ -37,11 +40,15 @@ interface ChatState {
 let wsListenersSetup = false
 let currentSocketId: string | null = null // Track socket ID to detect socket changes
 let messageCreatedHandler: ((message: any) => void) | null = null
+let messageStatusHandler: ((data: any) => void) | null = null
 let conversationCreatedHandler: ((data: any) => void) | null = null
 let conversationInvitedHandler: ((data: any) => void) | null = null
 let conversationDeletedHandler: ((data: any) => void) | null = null
 let conversationMemberAddedHandler: ((data: any) => void) | null = null
 let conversationMemberRemovedHandler: ((data: any) => void) | null = null
+let conversationAvatarUpdatedHandler: ((data: any) => void) | null = null
+let conversationNameUpdatedHandler: ((data: any) => void) | null = null
+let conversationModeratorUpdatedHandler: ((data: any) => void) | null = null
 let typingHandler: ((data: any) => void) | null = null
 let nicknameUpdatedHandler_local: ((data: any) => void) | null = null
 
@@ -67,6 +74,33 @@ const loadNicknamesFromStorage = (): Map<string, Map<number, string>> => {
   return new Map<string, Map<number, string>>()
 }
 
+// Save messages to localStorage
+const saveMessagesToStorage = (conversationId: string | undefined, messages: Message[]) => {
+  if (!conversationId) return
+  try {
+    localStorage.setItem(`chat_messages_${conversationId}`, JSON.stringify(messages))
+    console.log('[chatStore] Saved', messages.length, 'messages to localStorage for conversation:', conversationId)
+  } catch (e) {
+    console.error('[chatStore] Failed to save messages to localStorage:', e)
+  }
+}
+
+// Load messages from localStorage
+const loadMessagesFromStorage = (conversationId: string | undefined): Message[] => {
+  if (!conversationId) return []
+  try {
+    const stored = localStorage.getItem(`chat_messages_${conversationId}`)
+    if (stored) {
+      const messages = JSON.parse(stored) as Message[]
+      console.log('[chatStore] Loaded', messages.length, 'messages from localStorage for conversation:', conversationId)
+      return messages
+    }
+  } catch (e) {
+    console.error('[chatStore] Failed to load messages from localStorage:', e)
+  }
+  return []
+}
+
 export const useChatStore = create<ChatState>((set, get) => ({
   conversations: [],
   selectedConversation: null,
@@ -75,7 +109,39 @@ export const useChatStore = create<ChatState>((set, get) => ({
   unreadCounts: new Map<string, number>(),
   nicknames: loadNicknamesFromStorage(),
 
-  setConversations: (conversations) => set({ conversations }),
+  setConversations: (conversations) => set(() => {
+    // Populate lastMessage from localStorage cache if backend doesn't provide it
+    const enrichedConversations = conversations.map((conv) => {
+      // If backend already has lastMessage, keep it
+      if (conv.lastMessage) {
+        return conv
+      }
+
+      // Try to load last message from localStorage cache
+      const cachedMessages = loadMessagesFromStorage(conv.id)
+      if (cachedMessages.length > 0) {
+        // Get the last message from cache
+        const lastCachedMessage = cachedMessages[cachedMessages.length - 1]
+        console.log('[chatStore] Using lastMessage from localStorage cache for conversation:', conv.id)
+        // Convert Message to Conversation.lastMessage format (sender_id: number)
+        const senderIdNum = lastCachedMessage.sender_id ? parseInt(lastCachedMessage.sender_id, 10) : undefined
+        return {
+          ...conv,
+          lastMessage: {
+            id: lastCachedMessage.id,
+            content: lastCachedMessage.content,
+            createdAt: lastCachedMessage.createdAt,
+            sender_id: senderIdNum,
+            sender: lastCachedMessage.sender,
+          },
+        }
+      }
+
+      return conv
+    })
+
+    return { conversations: enrichedConversations }
+  }),
 
   addConversation: (conversation) =>
     set((state) => {
@@ -92,9 +158,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set({ selectedConversation: conversation }),
 
   setMessages: (messages) => {
+    const conversationId = get().selectedConversation?.id
     console.log('[chatStore] setMessages called with', messages.length, 'messages')
     console.log('[chatStore] Messages sample:', messages[0])
     set({ messages })
+    // Save to localStorage
+    saveMessagesToStorage(conversationId, messages)
     console.log('[chatStore] Messages set to store, current length:', get().messages.length)
   },
 
@@ -106,7 +175,20 @@ export const useChatStore = create<ChatState>((set, get) => ({
         console.log('Message already exists, skipping:', message.id)
         return state
       }
-      return { messages: [...state.messages, message] }
+      const newMessages = [...state.messages, message]
+      // Save to localStorage
+      saveMessagesToStorage(state.selectedConversation?.id, newMessages)
+      return { messages: newMessages }
+    }),
+
+  updateMessage: (messageId, updates) =>
+    set((state) => {
+      const updatedMessages = state.messages.map((m) =>
+        m.id === messageId ? { ...m, ...updates } : m
+      )
+      // Save to localStorage
+      saveMessagesToStorage(state.selectedConversation?.id, updatedMessages)
+      return { messages: updatedMessages }
     }),
 
   updateConversationLastMessage: (conversationId, message) =>
@@ -240,24 +322,34 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set((state) => {
       const newNicknames = new Map(state.nicknames)
       const conversationNicknames = new Map(newNicknames.get(conversationId) || [])
-      if (nickname) {
-        conversationNicknames.set(userId, nickname)
-      } else {
-        conversationNicknames.delete(userId)
-      }
+      conversationNicknames.set(userId, nickname)
       newNicknames.set(conversationId, conversationNicknames)
+
       // Persist to localStorage
       try {
         const serialized = JSON.stringify(Array.from(newNicknames.entries()).map(([convId, userMap]) =>
           [convId, Array.from(userMap.entries())]
         ))
         localStorage.setItem('chat_nicknames', serialized)
-        console.log('[chatStore] Nickname saved to localStorage:', { conversationId, userId, nickname })
+        console.log('[chatStore] Nickname saved to localStorage')
       } catch (e) {
         console.error('[chatStore] Failed to save nickname to localStorage:', e)
       }
+
       return { nicknames: newNicknames }
     }),
+
+  loadMessagesFromStorage: (conversationId) => {
+    return loadMessagesFromStorage(conversationId)
+  },
+
+  clearMessages: () => {
+    const conversationId = get().selectedConversation?.id
+    set({ messages: [] })
+    if (conversationId) {
+      saveMessagesToStorage(conversationId, [])
+    }
+  },
 
   getNickname: (conversationId, userId) => {
     const nicknames = get().nicknames.get(conversationId)
@@ -285,11 +377,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
       // We can't remove listeners from old socket since we don't have reference to it
       wsListenersSetup = false
       messageCreatedHandler = null
+      messageStatusHandler = null
       conversationCreatedHandler = null
       conversationInvitedHandler = null
       conversationDeletedHandler = null
       conversationMemberAddedHandler = null
       conversationMemberRemovedHandler = null
+      conversationAvatarUpdatedHandler = null
+      conversationNameUpdatedHandler = null
+      conversationModeratorUpdatedHandler = null
       typingHandler = null
       nicknameUpdatedHandler_local = null
       receivedMessageIds.clear()
@@ -305,6 +401,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (messageCreatedHandler) {
       socket.off('message:created', messageCreatedHandler)
     }
+    if (messageStatusHandler) {
+      socket.off('message:status', messageStatusHandler)
+    }
     if (conversationCreatedHandler) {
       socket.off('conversation:created', conversationCreatedHandler)
     }
@@ -319,6 +418,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
     if (conversationMemberRemovedHandler) {
       socket.off('conversation:member-removed', conversationMemberRemovedHandler)
+    }
+    if (conversationAvatarUpdatedHandler) {
+      socket.off('conversation:avatar-updated', conversationAvatarUpdatedHandler)
+    }
+    if (conversationNameUpdatedHandler) {
+      socket.off('conversation:name-updated', conversationNameUpdatedHandler)
+    }
+    if (conversationModeratorUpdatedHandler) {
+      socket.off('conversation:moderator-updated', conversationModeratorUpdatedHandler)
     }
     if (typingHandler) {
       socket.off('typing', typingHandler)
@@ -361,6 +469,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
               id: String(senderId),
               name: foundSender.username,
               email: foundSender.email,
+              avatar_url: foundSender.avatar_url,
             }
           }
         } catch (error) {
@@ -403,6 +512,26 @@ export const useChatStore = create<ChatState>((set, get) => ({
           state.incrementUnreadCount(transformedMessage.conversationId)
         }
       }
+    }
+
+    // Handler for message:status events (read receipts)
+    messageStatusHandler = (data: any) => {
+      console.log('Received message:status event:', data)
+
+      const { messageId, status, deliveryInfo, seen_by, read_at } = data
+      if (!messageId) {
+        console.log('Invalid message:status data, ignoring')
+        return
+      }
+
+      // Update message in store with new delivery info
+      const state = get()
+      state.updateMessage(messageId, {
+        status,
+        delivery_info: deliveryInfo,
+        seen_by,
+        read_at,
+      })
     }
 
     // Handler for conversation:created events
@@ -649,12 +778,114 @@ export const useChatStore = create<ChatState>((set, get) => ({
       state.setNickname(conversationId, targetUserId, nickname)
     }
 
+    // Handler for conversation avatar updated events
+    conversationAvatarUpdatedHandler = (data: any) => {
+      console.log('Received conversation:avatar-updated event:', data)
+
+      const { conversationId, avatar } = data
+      if (!conversationId) {
+        console.log('Invalid avatar-updated data, ignoring')
+        return
+      }
+
+      // Update conversation in store
+      set((state) => {
+        const updatedConversations = state.conversations.map((c) =>
+          c.id === conversationId ? { ...c, avatar } : c
+        )
+
+        let updatedSelected = state.selectedConversation
+        if (state.selectedConversation?.id === conversationId) {
+          updatedSelected = { ...state.selectedConversation, avatar } as Conversation
+        }
+
+        return {
+          conversations: updatedConversations,
+          selectedConversation: updatedSelected,
+        }
+      })
+
+      console.log('Conversation avatar updated:', conversationId, avatar)
+    }
+
+    // Handler for conversation name updated events
+    conversationNameUpdatedHandler = (data: any) => {
+      console.log('Received conversation:name-updated event:', data)
+
+      const { conversationId, name } = data
+      if (!conversationId) {
+        console.log('Invalid name-updated data, ignoring')
+        return
+      }
+
+      // Update conversation in store
+      set((state) => {
+        const updatedConversations = state.conversations.map((c) =>
+          c.id === conversationId ? { ...c, name } : c
+        )
+
+        let updatedSelected = state.selectedConversation
+        if (state.selectedConversation?.id === conversationId) {
+          updatedSelected = { ...state.selectedConversation, name } as Conversation
+        }
+
+        return {
+          conversations: updatedConversations,
+          selectedConversation: updatedSelected,
+        }
+      })
+
+      console.log('Conversation name updated:', conversationId, name)
+    }
+
+    // Handler for conversation moderator updated events
+    conversationModeratorUpdatedHandler = async (data: any) => {
+      console.log('Received conversation:moderator-updated event:', data)
+
+      const { conversationId } = data
+      if (!conversationId) {
+        console.log('Invalid moderator-updated data, ignoring')
+        return
+      }
+
+      // Fetch updated conversation from server to get new moderator_ids
+      try {
+        const { chatService } = await import('@/services/chatService')
+        const updatedConversation = await chatService.getConversationById(conversationId)
+
+        // Update the conversation in the store
+        set((state) => {
+          const updatedConversations = state.conversations.map((c) =>
+            c.id === conversationId ? updatedConversation : c
+          )
+
+          let updatedSelected = state.selectedConversation
+          if (state.selectedConversation?.id === conversationId) {
+            updatedSelected = updatedConversation
+          }
+
+          return {
+            conversations: updatedConversations,
+            selectedConversation: updatedSelected,
+          }
+        })
+
+        console.log('Conversation moderator updated:', conversationId, updatedConversation.moderator_ids)
+      } catch (error) {
+        console.error('Failed to fetch updated conversation for moderator update:', error)
+      }
+    }
+
     socket.on('message:created', messageCreatedHandler)
+    socket.on('message:status', messageStatusHandler)
     socket.on('conversation:created', conversationCreatedHandler)
     socket.on('conversation:invited', conversationInvitedHandler)
     socket.on('conversation:deleted', conversationDeletedHandler)
     socket.on('conversation:member-added', conversationMemberAddedHandler)
     socket.on('conversation:member-removed', conversationMemberRemovedHandler)
+    socket.on('conversation:avatar-updated', conversationAvatarUpdatedHandler)
+    socket.on('conversation:name-updated', conversationNameUpdatedHandler)
+    socket.on('conversation:moderator-updated', conversationModeratorUpdatedHandler)
     socket.on('typing', typingHandler)
     socket.on('nickname:updated', nicknameUpdatedHandler_local)
     wsListenersSetup = true

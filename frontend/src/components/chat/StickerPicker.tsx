@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Smile, X, GripVertical } from 'lucide-react'
+import { Smile, X, GripVertical, User } from 'lucide-react'
 import { getSocket } from '@/lib/socket'
 import { useAuthStore } from '@/store/authStore'
 import { useChatStore } from '@/store/chatStore'
@@ -12,14 +12,19 @@ interface StickerPickerProps {
 
 // Sticker categories with emojis
 const stickerCategories = [
-  { name: 'Yêu thích', emojis: ['❤️', '😍', '🥰', '😘', '💕', '💖', '💗', '💓', '💝', '💞', '👍', '👏', '🙏', '✨', '⭐'] },
-  { name: 'Cười', emojis: ['😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '🙃', '😉', '😊', '😇', '🥰', '😍'] },
-  { name: 'Mặt buồn', emojis: ['☹️', '😟', '😕', '🙁', '😮', '😯', '😲', '😳', '🥺', '😦', '😧', '😨', '😰', '😥', '😢'] },
-  { name: 'Tức giận', emojis: ['😠', '😡', '🤬', '😈', '💀', '☠️', '💩', '🤡', '👹', '👺', '🤬', '😾', '👿', '💢'] },
-  { name: 'Ngạc nhiên', emojis: ['😲', '😯', '😦', '🙄', '😑', '🤔', '🤨', '😐', '😶', '🫥', '🫠', '😶‍🌫️'] },
-  { name: 'Động vật', emojis: ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵'] },
-  { name: 'Hoạt động', emojis: ['🎉', '🎊', '🎈', '🎁', '🏆', '🥇', '🥈', '🥉', '🏅', '🎖️', '🏵️', '🎗️', '🎙️', '🎚️', '🛕️'] },
-  { name: 'Thức ăn', emojis: ['🍕', '🍔', '🍟', '🌭', '🍿', '🧂', '🥓', '🥩', '🍗', '🍖', '🌮', '🌯', '🥙', '🥚', '🍜'] },
+  {
+    name: 'Avatar',
+    type: 'avatar',
+    emojis: ['👍', '❤️', '😆', '😮', '😢', '😡', '🥰', '👏', '🙏', '🎉', '🔥', '💯', '👀', '🤔', '😎', '🥳', '😴', '🤣', '😇', '🫠']
+  },
+  { name: 'Yêu thích', type: 'emoji', emojis: ['❤️', '😍', '🥰', '😘', '💕', '💖', '💗', '💓', '💝', '💞', '👍', '👏', '🙏', '✨', '⭐'] },
+  { name: 'Cười', type: 'emoji', emojis: ['😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '🙃', '😉', '😊', '😇', '🥰', '😍'] },
+  { name: 'Mặt buồn', type: 'emoji', emojis: ['☹️', '😟', '😕', '🙁', '😮', '😯', '😲', '😳', '🥺', '😦', '😧', '😨', '😰', '😥', '😢'] },
+  { name: 'Tức giận', type: 'emoji', emojis: ['😠', '😡', '🤬', '😈', '💀', '☠️', '💩', '🤡', '👹', '👺', '🤬', '😾', '👿', '💢'] },
+  { name: 'Ngạc nhiên', type: 'emoji', emojis: ['😲', '😯', '😦', '🙄', '😑', '🤔', '🤨', '😐', '😶', '🫥', '🫠', '😶‍🌫️'] },
+  { name: 'Động vật', type: 'emoji', emojis: ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵'] },
+  { name: 'Hoạt động', type: 'emoji', emojis: ['🎉', '🎊', '🎈', '🎁', '🏆', '🥇', '🥈', '🥉', '🏅', '🎖️', '🏵️', '🎗️', '🎙️', '🎚️', '🛕️'] },
+  { name: 'Thức ăn', type: 'emoji', emojis: ['🍕', '🍔', '🍟', '🌭', '🍿', '🧂', '🥓', '🥩', '🍗', '🍖', '🌮', '🌯', '🥙', '🥚', '🍜'] },
 ]
 
 export default function StickerPicker({ onClose, triggerRef }: StickerPickerProps) {
@@ -200,12 +205,13 @@ export default function StickerPicker({ onClose, triggerRef }: StickerPickerProp
           <button
             key={index}
             onClick={() => setActiveCategory(index)}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors flex items-center gap-1.5 ${
               activeCategory === index
                 ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
                 : 'hover:bg-gray-100 dark:hover:bg-[#3a3b3c] text-gray-600 dark:text-[#b0b3b8]'
             }`}
           >
+            {category.type === 'avatar' && <User className="w-3.5 h-3.5" />}
             {category.name}
           </button>
         ))}
@@ -213,13 +219,13 @@ export default function StickerPicker({ onClose, triggerRef }: StickerPickerProp
 
       {/* Stickers Grid */}
       <div className="flex-1 overflow-y-auto p-3">
-        <div className="grid grid-cols-6 gap-2">
+        <div className="grid grid-cols-5 gap-2">
           {stickerCategories[activeCategory].emojis.map((sticker, index) => (
             <button
               key={index}
               type="button"
               onClick={(e) => handleSendSticker(sticker, e)}
-              className="w-12 h-12 text-2xl hover:bg-gray-100 dark:hover:bg-[#3a3b3c] rounded-lg transition-all hover:scale-110 active:scale-95 flex items-center justify-center"
+              className="w-14 h-14 text-3xl hover:bg-gray-100 dark:hover:bg-[#3a3b3c] rounded-xl transition-all hover:scale-110 active:scale-95 flex items-center justify-center"
             >
               {sticker}
             </button>

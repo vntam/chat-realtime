@@ -144,6 +144,7 @@ export default function ConversationList() {
               user_id: userId,
               name: user?.username || `User ${userId}`,
               email: user?.email || '',
+              avatar_url: user?.avatar_url,
             }
           }),
           lastMessage: lastMessageWithSender,
@@ -178,6 +179,16 @@ export default function ConversationList() {
     // For non-group conversations, show other participant's name
     const otherParticipant = conversation.participants.find((p) => p.user_id !== user?.user_id)
     return otherParticipant?.name || 'Unknown'
+  }
+
+  const getConversationAvatar = (conversation: Conversation) => {
+    // For group chats, use conversation avatar
+    if (conversation.isGroup && conversation.avatar) {
+      return conversation.avatar
+    }
+    // For private chats, use the other participant's avatar
+    const otherParticipant = conversation.participants.find((p) => p.user_id !== user?.user_id)
+    return otherParticipant?.avatar_url
   }
 
   const formatTime = (dateString: string) => {
@@ -281,6 +292,7 @@ export default function ConversationList() {
                   <div className="relative flex-shrink-0">
                     <Avatar
                       username={getConversationName(conversation)}
+                      src={getConversationAvatar(conversation)}
                       size="lg"
                       className="shadow-md group-hover:shadow-lg transition-smooth"
                     />

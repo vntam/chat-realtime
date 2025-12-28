@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody, DialogFooter } from '@/components/ui/Dialog'
 import Button from '@/components/ui/Button'
 import Avatar from '@/components/ui/Avatar'
-import { LogOut, UserPlus, X, Trash2, Shield, ShieldOff, UserMinus, Edit3 } from 'lucide-react'
+import { LogOut, UserPlus, X, Trash2, Shield, ShieldOff, UserMinus, Edit3, Camera, Loader2 } from 'lucide-react'
 import { useChatStore } from '@/store/chatStore'
 import { useAuthStore } from '@/store/authStore'
 import { userService } from '@/services/userService'
@@ -15,6 +15,7 @@ interface MemberWithInfo {
   name: string
   username: string
   email: string
+  avatar_url?: string
   nickname?: string // Custom nickname for this user
 }
 
@@ -45,6 +46,8 @@ export default function MembersModal({ open, onClose, conversation }: MembersMod
   const [actionInProgress, setActionInProgress] = useState<string | null>(null) // Track which user action is in progress
   const [editingNickname, setEditingNickname] = useState<number | null>(null) // User ID being edited
   const [nicknameInput, setNicknameInput] = useState('')
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const isGroup = conversation?.isGroup
   const isMember = conversation?.participants?.some(
@@ -53,6 +56,18 @@ export default function MembersModal({ open, onClose, conversation }: MembersMod
   const isAdmin = conversation?.admin_id === currentUser?.user_id
   const moderators = conversation?.moderator_ids || []
   const isModerator = moderators.includes(currentUser?.user_id || 0)
+
+  // Debug logging for avatar upload visibility
+  console.log('[MembersModal] Group Avatar Upload Debug:')
+  console.log('  isGroup:', isGroup)
+  console.log('  conversation:', conversation)
+  console.log('  conversation.admin_id:', conversation?.admin_id)
+  console.log('  conversation.moderator_ids:', conversation?.moderator_ids)
+  console.log('  currentUser:', currentUser)
+  console.log('  currentUser.user_id:', currentUser?.user_id)
+  console.log('  isAdmin:', isAdmin)
+  console.log('  isModerator:', isModerator)
+  console.log('  Show avatar upload:', isGroup && (isAdmin || isModerator))
 
   useEffect(() => {
     if (open && conversation) {
@@ -123,6 +138,7 @@ export default function MembersModal({ open, onClose, conversation }: MembersMod
           name: user.username,
           username: user.username,
           email: user.email,
+          avatar_url: user.avatar_url,
           nickname: nicknameMap.get(user.user_id),
         })
       })
@@ -338,7 +354,8 @@ export default function MembersModal({ open, onClose, conversation }: MembersMod
         socket.emit('conversation:promote-moderator', {
           conversationId: conversation.id,
           userId: participantId,
-          userName: participantName,
+          actorName: currentUser?.username,
+          targetUserName: participantName,
         }, (response: any) => {
           if (response?.ok) {
             console.log('Member promoted successfully')
@@ -374,6 +391,8 @@ export default function MembersModal({ open, onClose, conversation }: MembersMod
         socket.emit('conversation:demote-moderator', {
           conversationId: conversation.id,
           userId: participantId,
+          actorName: currentUser?.username,
+          targetUserName: participantName,
         }, (response: any) => {
           if (response?.ok) {
             console.log('Member demoted successfully')
@@ -474,6 +493,78 @@ export default function MembersModal({ open, onClose, conversation }: MembersMod
     setNicknameInput('')
   }
 
+  const handleAvatarUpload = async (file: File) => {
+    if (!conversation) return
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Vui lòng chọn file ảnh')
+      return
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Kích thước file không được quá 5MB')
+      return
+    }
+
+    setIsUploadingAvatar(true)
+    try {
+      const { chatService } = await import('@/services/chatService')
+      const socket = getSocket()
+
+      // First upload the file
+      const { url } = await chatService.uploadFile(file)
+
+      console.log('[AvatarUpload] File uploaded successfully:', url)
+
+      // Then update the conversation via WebSocket (for realtime updates)
+      if (socket && socket.connected) {
+        socket.emit('conversation:update-avatar', {
+          conversationId: conversation.id,
+          avatarUrl: url,
+          actorName: currentUser?.username,
+        }, (response: any) => {
+          console.log('[AvatarUpload] WebSocket response:', response)
+          if (response?.ok) {
+            console.log('[AvatarUpload] Avatar updated successfully via WebSocket')
+          } else {
+            console.error('[AvatarUpload] WebSocket error:', response?.error)
+            // Fallback to REST API if WebSocket fails
+            chatService.updateConversation(conversation.id, { avatar: url })
+              .then(() => {
+                console.log('[AvatarUpload] Avatar updated via REST API fallback')
+                fetchConversationData()
+              })
+              .catch((err) => {
+                console.error('[AvatarUpload] REST API fallback failed:', err)
+                alert('Không thể cập nhật ảnh đại diện')
+              })
+          }
+          setIsUploadingAvatar(false)
+        })
+      } else {
+        console.log('[AvatarUpload] Socket not connected, using REST API')
+        // Fallback to REST API if socket is not connected
+        await chatService.updateConversation(conversation.id, { avatar: url })
+        console.log('[AvatarUpload] Avatar updated via REST API')
+        fetchConversationData()
+        setIsUploadingAvatar(false)
+      }
+    } catch (error) {
+      console.error('[AvatarUpload] Failed to upload avatar:', error)
+      alert('Không thể tải lên ảnh đại diện')
+      setIsUploadingAvatar(false)
+    }
+  }
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      handleAvatarUpload(file)
+    }
+  }
+
   if (!conversation) return null
 
   return (
@@ -563,6 +654,44 @@ export default function MembersModal({ open, onClose, conversation }: MembersMod
               <DialogTitle>{isGroup ? 'Thành viên nhóm' : 'Thông tin cuộc trò chuyện'}</DialogTitle>
             </DialogHeader>
             <DialogBody className="flex-1 overflow-y-auto space-y-4">
+              {/* Group Avatar Section - only for groups and admin/moderator */}
+              {isGroup && (isAdmin || isModerator) && (
+                <div className="flex items-center justify-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                  <div className="relative group">
+                    <Avatar
+                      username={conversation.name || 'Nhóm'}
+                      src={conversation.avatar}
+                      size="xl"
+                      className="w-24 h-24 shadow-lg"
+                    />
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileSelect}
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploadingAvatar}
+                      className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Thay đổi ảnh đại diện"
+                    >
+                      {isUploadingAvatar ? (
+                        <Loader2 className="w-6 h-6 text-white animate-spin" />
+                      ) : (
+                        <Camera className="w-6 h-6 text-white" />
+                      )}
+                    </button>
+                  </div>
+                  <div className="ml-4 flex-1">
+                    <h3 className="font-semibold text-lg">{conversation.name || 'Nhóm'}</h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Nhấp vào ảnh để thay đổi đại diện nhóm</p>
+                  </div>
+                </div>
+              )}
+
               {/* Members list */}
               <div className="border border-border rounded-lg max-h-96 overflow-y-auto">
                 {membersWithInfo.map((member) => {
@@ -586,6 +715,7 @@ export default function MembersModal({ open, onClose, conversation }: MembersMod
                     >
                       <Avatar
                         username={displayName}
+                        src={member.avatar_url}
                         size="lg"
                         className="flex-shrink-0 shadow-md"
                       />
@@ -619,21 +749,21 @@ export default function MembersModal({ open, onClose, conversation }: MembersMod
                             </button>
                           </div>
                         ) : (
-                          <p className="text-sm font-medium text-gray-900 flex items-center flex-wrap gap-1">
+                          <p className="text-sm font-medium text-gray-900 dark:text-[#e4e6eb] flex items-center flex-wrap gap-1">
                             <span className="truncate">{displayName}</span>
                             {hasNickname && (
-                              <span className="text-xs text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded">
+                              <span className="text-xs text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 px-1.5 py-0.5 rounded">
                                 {member.username}
                               </span>
                             )}
-                            {isCurrentUser && <span className="text-xs text-muted-foreground">(Bạn)</span>}
+                            {isCurrentUser && <span className="text-xs text-gray-500 dark:text-[#b0b3b8]">(Bạn)</span>}
                             {isAdminMember && (
-                              <span className="ml-auto text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium">
+                              <span className="ml-auto text-xs bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 px-2 py-0.5 rounded-full font-medium">
                                 Admin
                               </span>
                             )}
                             {isModeratorMember && (
-                              <span className="ml-auto text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
+                              <span className="ml-auto text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 px-2 py-0.5 rounded-full font-medium">
                                 Phó nhóm
                               </span>
                             )}

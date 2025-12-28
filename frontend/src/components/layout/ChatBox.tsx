@@ -9,10 +9,11 @@ import ChatMessages from '@/components/chat/ChatMessages'
 import ChatInput from '@/components/chat/ChatInput'
 import MembersModal from '@/components/chat/MembersModal'
 import Button from '@/components/ui/Button'
+import Avatar from '@/components/ui/Avatar'
 
 export default function ChatBox() {
   const { user } = useAuthStore()
-  const { selectedConversation, setMessages, setupWebSocketListeners, markConversationAsRead, setNicknames } = useChatStore()
+  const { selectedConversation, setMessages, setupWebSocketListeners, markConversationAsRead, setNicknames, loadMessagesFromStorage } = useChatStore()
   const [showMembersModal, setShowMembersModal] = useState(false)
   const [showOptionsMenu, setShowOptionsMenu] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -60,6 +61,17 @@ export default function ChatBox() {
       if (!selectedConversation?.id) return
 
       console.log('loadMessagesDirectly called for:', selectedConversation.id)
+
+      // First, load messages from localStorage (cache)
+      const cachedMessages = loadMessagesFromStorage(selectedConversation.id)
+      if (cachedMessages.length > 0) {
+        console.log('Loaded', cachedMessages.length, 'messages from localStorage cache')
+        setMessages(cachedMessages)
+      } else {
+        // Clear messages immediately when switching conversations
+        setMessages([])
+        console.log('Messages cleared, preparing to load new messages')
+      }
 
       try {
         // Auto-accept pending conversations (to allow replying)
@@ -126,6 +138,7 @@ export default function ChatBox() {
               id: String(senderId),
               name: sender?.username || `User ${senderId}`,
               email: sender?.email || '',
+              avatar_url: sender?.avatar_url,
             },
           }
         })
@@ -139,9 +152,25 @@ export default function ChatBox() {
         })
         console.log('Sorted messages:', sortedMessages.length)
 
-        // Set messages in store BEFORE joining socket room
-        setMessages(sortedMessages)
-        console.log('✅ Messages set to store:', sortedMessages.length, 'Calling setMessages now')
+        // Merge backend messages with cached messages to avoid losing any
+        const currentMessages = useChatStore.getState().messages
+        const currentMessageIds = new Set(currentMessages.map(m => m.id))
+
+        // Add backend messages that are not in current cache
+        const newMessagesFromBackend = sortedMessages.filter((m: any) => !currentMessageIds.has(m.id))
+
+        if (newMessagesFromBackend.length > 0) {
+          console.log('Adding', newMessagesFromBackend.length, 'new messages from backend')
+          const mergedMessages = [...currentMessages, ...newMessagesFromBackend].sort((a, b) => {
+            const dateA = new Date(a.createdAt).getTime()
+            const dateB = new Date(b.createdAt).getTime()
+            return dateA - dateB
+          })
+          setMessages(mergedMessages)
+        } else {
+          console.log('No new messages from backend, keeping', currentMessages.length, 'cached messages')
+        }
+        console.log('✅ Messages handling complete, total:', useChatStore.getState().messages.length)
       } catch (error) {
         console.error('❌ Failed to load messages:', error)
       }
@@ -199,6 +228,19 @@ export default function ChatBox() {
     return otherParticipant?.name || 'Unknown'
   }
 
+  const getConversationAvatar = () => {
+    if (!selectedConversation) return undefined
+
+    // For group chats, use conversation avatar
+    if (selectedConversation.isGroup && selectedConversation.avatar) {
+      return selectedConversation.avatar
+    }
+    // For private chats, use the other participant's avatar
+    const currentUserId = String(user?.user_id)
+    const otherParticipant = selectedConversation.participants.find((p) => p.id !== currentUserId)
+    return otherParticipant?.avatar_url
+  }
+
   if (!selectedConversation) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center bg-gray-50 dark:bg-[#1c1e21] text-gray-500 dark:text-[#b0b3b8]">
@@ -213,11 +255,12 @@ export default function ChatBox() {
       {/* Chat Header */}
       <div className="h-16 bg-white/80 dark:bg-[#242526]/80 backdrop-blur-xl border-b border-gray-200 dark:border-[#3a3b3c] px-6 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-md">
-            <span className="text-white font-bold text-sm">
-              {getConversationName()[0]?.toUpperCase()}
-            </span>
-          </div>
+          <Avatar
+            username={getConversationName()}
+            src={getConversationAvatar()}
+            size="lg"
+            className="shadow-md"
+          />
           <div>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-[#e4e6eb]">{getConversationName()}</h2>
             <p className="text-xs text-gray-500 dark:text-[#b0b3b8]">

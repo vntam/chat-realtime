@@ -5,22 +5,23 @@ import HomePage from '@/pages/HomePage'
 import LoginPage from '@/pages/LoginPage'
 import UsersPage from '@/pages/UsersPage'
 import SettingsPage from '@/pages/SettingsPage'
+import UserManagementPage from '@/pages/UserManagementPage'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import ToastContainer from '@/components/ui/Toast'
 import { useThemeStore } from '@/store/themeStore'
 
 function App() {
-  const { theme } = useThemeStore()
+  const { effectiveTheme } = useThemeStore()
 
   // Initialize theme on mount
   useEffect(() => {
     // Apply theme to document
     document.documentElement.classList.remove('light', 'dark')
-    document.documentElement.classList.add(theme)
+    document.documentElement.classList.add(effectiveTheme)
 
     // Also set directly on HTML tag for better compatibility
-    document.documentElement.setAttribute('data-theme', theme)
-  }, [theme])
+    document.documentElement.setAttribute('data-theme', effectiveTheme)
+  }, [effectiveTheme])
 
   return (
     <Router>
@@ -39,6 +40,7 @@ function App() {
         >
           <Route index element={<HomePage />} />
           <Route path="users" element={<UsersPage />} />
+          <Route path="admin/users" element={<UserManagementPage />} />
           <Route path="settings" element={<SettingsPage />} />
         </Route>
 

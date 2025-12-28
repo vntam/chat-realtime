@@ -7,6 +7,7 @@ interface User {
   username: string
   avatar_url?: string
   status?: string
+  role?: string
 }
 
 interface AuthState {
@@ -42,6 +43,12 @@ export const useAuthStore = create<AuthState>((set) => ({
     // Clear sessionStorage and cookies
     sessionStorage.removeItem('access_token')
     set({ user: null, isAuthenticated: false })
+
+    // Reset theme to default (light mode) when logout
+    localStorage.removeItem('theme')
+    document.documentElement.classList.remove('dark')
+    document.documentElement.classList.add('light')
+    document.documentElement.setAttribute('data-theme', 'light')
   },
 
   // Refresh user data from backend API
