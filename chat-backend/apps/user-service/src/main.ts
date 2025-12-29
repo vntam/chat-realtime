@@ -49,10 +49,10 @@ async function bootstrap() {
   SwaggerModule.setup('api/docs', app, document);
 
   const port = process.env.USER_SERVICE_PORT ?? process.env.PORT ?? 3001;
-  await app.listen(port);
+  await app.listen(port, '0.0.0.0');
 
-  console.log(`🚀 User Service running on: http://localhost:${port}`);
-  console.log(`📚 API Docs available at: http://localhost:${port}/api/docs`);
+  console.log(`🚀 User Service running on: http://0.0.0.0:${port}`);
+  console.log(`📚 API Docs available at: http://0.0.0.0:${port}/api/docs`);
   console.log(`📦 PostgreSQL: Connected to user_db`);
 }
 

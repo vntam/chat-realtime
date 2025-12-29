@@ -98,12 +98,12 @@ async function bootstrap() {
   );
 
   const port = process.env.PORT ?? 3000;
-  await app.listen(port);
+  await app.listen(port, '0.0.0.0');
 
-  logger.log(`🚀 API Gateway running on: http://localhost:${port}`);
-  logger.log(`📚 API Docs available at: http://localhost:${port}/api/docs`);
-  logger.log(`📊 Metrics available at: http://localhost:${port}/metrics`);
-  logger.log(`🏥 Health check at: http://localhost:${port}/health`);
+  logger.log(`🚀 API Gateway running on: http://0.0.0.0:${port}`);
+  logger.log(`📚 API Docs available at: http://0.0.0.0:${port}/api/docs`);
+  logger.log(`📊 Metrics available at: http://0.0.0.0:${port}/metrics`);
+  logger.log(`🏥 Health check at: http://0.0.0.0:${port}/health`);
   logger.log(`\n📌 Proxying to:`);
   logger.log(`   • User Service: ${userServiceUrl}`);
   logger.log(`   • Chat Service: ${chatServiceUrl}`);
