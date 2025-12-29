@@ -7,6 +7,7 @@ import {
   OnGatewayInit,
   MessageBody,
   ConnectedSocket,
+  Optional,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { Logger, UnauthorizedException, Inject } from '@nestjs/common';
@@ -56,9 +57,11 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
     private readonly jwtService: JwtService,
     private readonly metricsService: MetricsService,
     private readonly socketService: SocketService,
-    @Inject('NOTIFICATION_SERVICE')
+    @Optional() @Inject('NOTIFICATION_SERVICE')
     private readonly notificationClient: ClientProxy,
-  ) {}
+  ) {
+    this.logger.log('ChatGateway initialized with notification client: ' + !!notificationClient);
+  }
 
   afterInit(server: Server) {
     // Set the server instance on SocketService so controllers can use it
@@ -368,16 +371,20 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
       });
 
       // Send notification via RabbitMQ for offline users
-      this.notificationClient.emit('group_invite.created', {
-        user_id: payload.userId,
-        title: `Lời mời tham gia nhóm`,
-        content: `Bạn được thêm vào nhóm "${conversation.name || 'Nhóm chat'}"`,
-        related_id: payload.conversationId,
-      });
+      if (this.notificationClient) {
+        this.notificationClient.emit('group_invite.created', {
+          user_id: payload.userId,
+          title: `Lời mời tham gia nhóm`,
+          content: `Bạn được thêm vào nhóm "${conversation.name || 'Nhóm chat'}"`,
+          related_id: payload.conversationId,
+        });
 
-      this.logger.log(
-        `Group invite notification sent for user ${payload.userId} to conversation ${payload.conversationId}`,
-      );
+        this.logger.log(
+          `Group invite notification sent for user ${payload.userId} to conversation ${payload.conversationId}`,
+        );
+      } else {
+        this.logger.debug(`Notification client not available, skipping RabbitMQ event`);
+      }
 
       return this.ack(true, result.conversation);
     } catch (error) {
@@ -973,6 +980,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
 
   /**
    * Send notification to all participants except sender via RabbitMQ
+   * NOTE: Temporarily disabled due to RabbitMQ connection issues on Render
    */
   private sendMessageNotifications(
     conversationId: string,
@@ -980,6 +988,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
     content: string,
     attachments?: string[],
   ): void {
+    // Skip RabbitMQ notifications for now - they were causing HTTP routes to timeout
+    if (!this.notificationClient) {
+      this.logger.debug(`[Notification] Skipping - notification client not available`);
+      return;
+    }
+
     try {
       this.logger.debug(
         `[Notification] Starting to send notifications for conversation ${conversationId}, sender ${senderId}`,
