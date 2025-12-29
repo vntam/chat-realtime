@@ -15,7 +15,11 @@ async function bootstrap(): Promise<void> {
   // Enable CORS
   const allowedOrigins = process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(',')
-    : ['http://localhost:3000', 'http://localhost:5173'];
+    : [
+        'http://localhost:3000',
+        'http://localhost:5173',
+        'http://chatrealtime-frontend-s3-2025.s3-website-ap-southeast-1.amazonaws.com',
+      ];
 
   app.enableCors({
     origin: allowedOrigins,

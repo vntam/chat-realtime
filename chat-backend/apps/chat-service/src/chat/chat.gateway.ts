@@ -43,6 +43,8 @@ interface WsAck {
   cors: {
     origin: process.env.ALLOWED_ORIGINS?.split(',') || [
       'http://localhost:3000',
+      'http://localhost:5173',
+      'http://chatrealtime-frontend-s3-2025.s3-website-ap-southeast-1.amazonaws.com',
     ],
     credentials: true,
   },
