@@ -76,11 +76,13 @@ export class AuthController {
   private setRefreshCookie(res: Response, token: string) {
     // Use COOKIE_SECURE env var (default to true in production, but can be overridden)
     const secure = process.env.COOKIE_SECURE === 'false' ? false : process.env.NODE_ENV === 'production';
+    // When COOKIE_SECURE=false, also remove SameSite for cross-domain cookies (HTTP -> HTTPS)
+    const sameSite = process.env.COOKIE_SECURE === 'false' ? (false as any) : 'lax';
 
     res.cookie('refreshToken', token, {
       httpOnly: true, // Không thể đọc bằng JavaScript
       secure, // Chỉ HTTPS khi COOKIE_SECURE=true (production default)
-      sameSite: 'lax', // Allow cookies across ports in dev
+      sameSite, // Allow cross-domain when COOKIE_SECURE=false
       path: '/auth', // Chỉ gửi cho auth endpoints
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 ngày
     });
@@ -92,11 +94,13 @@ export class AuthController {
   private setAccessCookie(res: Response, token: string) {
     // Use COOKIE_SECURE env var (default to true in production, but can be overridden)
     const secure = process.env.COOKIE_SECURE === 'false' ? false : process.env.NODE_ENV === 'production';
+    // When COOKIE_SECURE=false, also remove SameSite for cross-domain cookies (HTTP -> HTTPS)
+    const sameSite = process.env.COOKIE_SECURE === 'false' ? (false as any) : 'lax';
 
     res.cookie('accessToken', token, {
       httpOnly: true, // Không thể đọc bằng JavaScript
       secure, // Chỉ HTTPS khi COOKIE_SECURE=true (production default)
-      sameSite: 'lax', // Allow cookies across ports in dev (strict blocks localhost:3001 -> localhost:3002)
+      sameSite, // Allow cross-domain when COOKIE_SECURE=false
       path: '/', // Send to all paths/services
       maxAge: 15 * 60 * 1000, // 15 phút (same as JWT expiry)
     });
