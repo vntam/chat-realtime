@@ -15,12 +15,15 @@ export function createReverseProxyMiddleware(
     target,
     changeOrigin: true,
     pathRewrite: (reqPath: string, req: any) => {
-      // http-proxy-middleware automatically prepends the path to target
-      // We just need to return the path portion WITHOUT the prefix
-      // Example: /conversations → Express strips to / → return / (or empty)
-      // Example: /conversations/123 → Express strips to /123 → return /123
-      // Just return req.path directly - http-proxy-middleware handles the rest
-      return req.path;
+      // Express strips the prefix (e.g., /auth) before passing to middleware
+      // We need to add it back for downstream services
+      // IMPORTANT: If req.path is '/', return empty string to avoid duplicate prefix
+      // Example: /auth/login → req.path = /login → return /auth/login
+      // Example: /conversations → req.path = / → return /conversations (not /conversations/)
+      if (req.path === '/') {
+        return path; // Return the prefix only, no trailing slash
+      }
+      return path + req.path;
     },
     ws: false, // WebSocket handled separately
     on: {
