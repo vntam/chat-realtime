@@ -1,4 +1,12 @@
+import axios from 'axios'
 import axiosInstance from '@/lib/axios'
+
+// Get direct Chat Service URL for file upload (bypass Gateway for multipart/form-data)
+const getChatServiceUrl = () => {
+  // Remove protocol and convert http://chat-service to https://chat-service
+  const wsUrl = import.meta.env.VITE_CHAT_WS_URL || 'http://localhost:3002'
+  return wsUrl.replace('ws://', 'http://').replace('wss://', 'https://')
+}
 
 export interface User {
   user_id: number
@@ -72,18 +80,35 @@ export const userService = {
     return response.data
   },
 
-  // Upload avatar
+  // Upload avatar - direct to Chat Service (bypass Gateway for multipart/form-data)
   uploadAvatar: async (file: File): Promise<{ url: string }> => {
     console.log('[userService] uploadAvatar called for file:', file.name, 'size:', file.size)
+
+    // Get token from sessionStorage
+    const token = sessionStorage.getItem('access_token')
+    if (!token) {
+      throw new Error('No authentication token found')
+    }
+
     const formData = new FormData()
     formData.append('file', file)
 
-    const response = await axiosInstance.post<{ url: string }>('/upload/single?folder=avatars', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-      timeout: 60000, // 60 seconds for file upload to S3
-    })
+    // Call Chat Service directly (not through Gateway) to avoid multipart proxy issues
+    const chatServiceUrl = getChatServiceUrl()
+    console.log('[userService] Uploading directly to Chat Service:', chatServiceUrl)
+
+    const response = await axios.post<{ url: string }>(
+      `${chatServiceUrl}/upload/single?folder=avatars`,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          'Authorization': `Bearer ${token}`,
+        },
+        timeout: 60000, // 60 seconds for file upload to S3
+        withCredentials: true,
+      }
+    )
     console.log('[userService] uploadAvatar response:', response.data)
     return response.data
   },
