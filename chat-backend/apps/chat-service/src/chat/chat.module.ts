@@ -2,8 +2,7 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { JwtModule } from '@nestjs/jwt';
 import { ChatService } from './chat.service';
-// TEMPORARILY DISABLED: ChatGateway to test if it's blocking HTTP
-// import { ChatGateway } from './chat.gateway';
+import { ChatGateway } from './chat.gateway';
 import { ChatController } from './chat.controller';
 import { SocketService } from './socket.service';
 import {
@@ -26,7 +25,7 @@ import { Nickname, NicknameSchema } from './schemas/nickname.schema';
     }),
   ],
   controllers: [ChatController],
-  providers: [ChatService, SocketService],
+  providers: [ChatService, SocketService, ChatGateway],
   exports: [ChatService, SocketService],
 })
 export class ChatModule {}
