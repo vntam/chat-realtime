@@ -14,8 +14,11 @@ import {
   ParseIntPipe,
   HttpCode,
   HttpStatus,
+  Logger,
+  BadRequestException,
 } from '@nestjs/common';
 import { UsersService } from './user.service';
+import { v4 as uuidv4 } from 'uuid';
 
 import {
   CreateUserDto,
@@ -30,6 +33,8 @@ import { JwtGuard } from '../auth/guards/jwt/jwt.guard';
 @Controller('users')
 @UseInterceptors(ClassSerializerInterceptor)
 export class UsersController {
+  private readonly logger = new Logger(UsersController.name);
+
   constructor(private readonly usersService: UsersService) {}
 
   @UseGuards(JwtGuard)
@@ -114,6 +119,47 @@ export class UsersController {
   ) {
     console.log('[UsersController] changePassword called for user:', userId);
     return await this.usersService.changePassword(userId, dto.oldPassword, dto.newPassword);
+  }
+
+  // Avatar upload - Base64 approach to avoid multipart/form-data issues
+  @UseGuards(JwtGuard)
+  @Post('upload-avatar')
+  @HttpCode(HttpStatus.OK)
+  async uploadAvatar(
+    @Body() body: { fileName: string; mimeType: string; base64: string },
+    @GetCurrentUser('sub') userId: number,
+  ) {
+    this.logger.log(`[UsersController] uploadAvatar called - userId: ${userId}`);
+    this.logger.log(`[UsersController] fileName: ${body.fileName}, base64 size: ${body.base64?.length || 0}`);
+
+    if (!body.base64 || !body.fileName) {
+      this.logger.error('[UsersController] Missing required fields');
+      throw new BadRequestException('Missing required fields: fileName, base64');
+    }
+
+    // Validate file size (500KB max for Base64)
+    const MAX_SIZE = 500 * 1024;
+    const bufferSize = Buffer.from(body.base64, 'base64').length;
+    if (bufferSize > MAX_SIZE) {
+      throw new BadRequestException(`File size exceeds ${MAX_SIZE / 1024}KB limit`);
+    }
+
+    // Validate mime type (only images allowed)
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(body.mimeType)) {
+      throw new BadRequestException(`File type ${body.mimeType} is not allowed`);
+    }
+
+    // Generate mock URL (using UUID)
+    const fileExtension = body.fileName.split('.').pop() || 'jpg';
+    const mockUrl = `http://localhost:3001/uploads/avatars/${userId}/${uuidv4()}.${fileExtension}`;
+    this.logger.log(`[UsersController] Generated avatar URL: ${mockUrl}`);
+
+    // Update user's avatar_url in database
+    const user = await this.usersService.updateAvatarUrl(userId, mockUrl);
+    this.logger.log(`[UsersController] Avatar updated for user ${userId}`);
+
+    return { url: mockUrl, user };
   }
 
   // roles

@@ -214,6 +214,22 @@ export class UsersService {
   }
 
   // ==================================================
+  // AVATAR UPLOAD
+  // ==================================================
+  /**
+   * Update user's avatar URL
+   * Called from uploadAvatar endpoint after file is uploaded
+   */
+  async updateAvatarUrl(id: number, avatarUrl: string): Promise<UserResponseDto> {
+    const user = await this.repo.findOne({ where: { user_id: id } });
+    if (!user) throw new NotFoundException('User not found');
+
+    user.avatar_url = avatarUrl;
+    const saved = await this.repo.save(user);
+    return this.toResponse(saved);
+  }
+
+  // ==================================================
   // ROLE MANAGEMENT
   // ==================================================
   async addRole(userId: number, roleId: number) {
