@@ -74,9 +74,12 @@ export class AuthController {
    * Helper: Set httpOnly cookie cho refresh token
    */
   private setRefreshCookie(res: Response, token: string) {
+    // Use COOKIE_SECURE env var (default to true in production, but can be overridden)
+    const secure = process.env.COOKIE_SECURE === 'false' ? false : process.env.NODE_ENV === 'production';
+
     res.cookie('refreshToken', token, {
       httpOnly: true, // Không thể đọc bằng JavaScript
-      secure: process.env.NODE_ENV === 'production', // Chỉ HTTPS trong production
+      secure, // Chỉ HTTPS khi COOKIE_SECURE=true (production default)
       sameSite: 'lax', // Allow cookies across ports in dev
       path: '/auth', // Chỉ gửi cho auth endpoints
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 ngày
@@ -87,9 +90,12 @@ export class AuthController {
    * Helper: Set httpOnly cookie cho access token
    */
   private setAccessCookie(res: Response, token: string) {
+    // Use COOKIE_SECURE env var (default to true in production, but can be overridden)
+    const secure = process.env.COOKIE_SECURE === 'false' ? false : process.env.NODE_ENV === 'production';
+
     res.cookie('accessToken', token, {
       httpOnly: true, // Không thể đọc bằng JavaScript
-      secure: process.env.NODE_ENV === 'production', // Chỉ HTTPS trong production
+      secure, // Chỉ HTTPS khi COOKIE_SECURE=true (production default)
       sameSite: 'lax', // Allow cookies across ports in dev (strict blocks localhost:3001 -> localhost:3002)
       path: '/', // Send to all paths/services
       maxAge: 15 * 60 * 1000, // 15 phút (same as JWT expiry)
