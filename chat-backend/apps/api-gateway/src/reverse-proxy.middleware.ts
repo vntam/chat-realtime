@@ -17,10 +17,14 @@ export function createReverseProxyMiddleware(
     pathRewrite: (reqPath: string, req: any) => {
       // Express strips the prefix before passing to middleware
       // We need to add it back for downstream services
-      // Example: /auth/login → /login (stripped by express) → /auth/login (add back)
-      // Don't add trailing slash - reqPath contains the original full path
-      // Just return the original path without modification
-      return reqPath
+      // Example: /auth/login → /login (stripped) → /auth/login (add back)
+      // IMPORTANT: req.path is the STRIPPED path (without prefix)
+      // If req.path is '/', just return the prefix (no trailing slash)
+      // Otherwise, return prefix + req.path
+      if (req.path === '/') {
+        return path; // Return '/conversations' not '/conversations/'
+      }
+      return path + req.path; // '/conversations' + '/123' = '/conversations/123'
     },
     ws: false, // WebSocket handled separately
     on: {
