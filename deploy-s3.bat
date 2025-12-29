@@ -21,7 +21,7 @@ echo ================================================
 echo.
 
 REM Configuration
-set BUCKET_NAME=chat-app-frontend-2025
+set BUCKET_NAME=chatrealtime-frontend-s3-2025
 set REGION=ap-southeast-1
 
 REM Check AWS CLI is installed
