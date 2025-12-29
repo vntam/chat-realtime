@@ -18,7 +18,9 @@ export function createReverseProxyMiddleware(
       // Express strips the prefix before passing to middleware
       // We need to add it back for downstream services
       // Example: /auth/login → /login (stripped by express) → /auth/login (add back)
-      return path + reqPath;
+      // Don't add trailing slash if not present in original path
+      const cleanPath = req.path.replace(new RegExp(`^${path}`), '')
+      return path + cleanPath
     },
     ws: false, // WebSocket handled separately
     on: {
