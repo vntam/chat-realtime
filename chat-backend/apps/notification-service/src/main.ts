@@ -73,11 +73,11 @@ async function bootstrap() {
   await app.startAllMicroservices();
 
   const port = process.env.NOTIFICATION_SERVICE_PORT || 3003;
-  await app.listen(port);
+  await app.listen(port, '0.0.0.0');
 
-  console.log(`🚀 Notification Service running on: http://localhost:${port}`);
-  console.log(`📚 API Docs available at: http://localhost:${port}/api/docs`);
-  console.log(`🔌 WebSocket namespace: ws://localhost:${port}/notifications`);
+  console.log(`🚀 Notification Service running on: http://0.0.0.0:${port}`);
+  console.log(`📚 API Docs available at: http://0.0.0.0:${port}/api/docs`);
+  console.log(`🔌 WebSocket namespace: ws://0.0.0.0:${port}/notifications`);
   console.log(`📨 RabbitMQ listener active on queue: notification_queue`);
   console.log(`📦 MongoDB: Connected to notification_db`);
 }
