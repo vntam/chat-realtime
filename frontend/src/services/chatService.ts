@@ -1,19 +1,8 @@
-import axios from 'axios'
+import axiosInstance from '@/lib/axios'
 
-const chatAPI = axios.create({
-  baseURL: import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:3000',
-  timeout: 10000,
-  withCredentials: true, // Send HttpOnly cookies automatically
-  headers: {
-    'Content-Type': 'application/json',
-  },
-})
-
-// No need to manually add token - cookies are sent automatically with withCredentials: true
-chatAPI.interceptors.request.use((config) => {
-  // HttpOnly cookies are automatically sent by browser
-  return config
-})
+// Use the same axios instance that has Authorization interceptor
+// This ensures token from sessionStorage is included in all requests
+const chatAPI = axiosInstance
 
 // Transform MongoDB response to match frontend interface
 chatAPI.interceptors.response.use((response) => {
