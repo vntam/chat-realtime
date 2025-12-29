@@ -16,7 +16,6 @@ import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { Public } from '@app/common';
 
 @Controller('conversations')
-@UseGuards(JwtAuthGuard)
 export class ChatController {
   constructor(
     private readonly chatService: ChatService,
@@ -35,6 +34,7 @@ export class ChatController {
   }
 
   @Get()
+  @UseGuards(JwtAuthGuard)
   async getConversations(@Request() req) {
     console.log('[ChatController] getConversations called');
     try {
@@ -58,6 +58,7 @@ export class ChatController {
   }
 
   @Get(':id')
+  @UseGuards(JwtAuthGuard)
   async getConversationById(@Param('id') id: string, @Request() req) {
     try {
       return await this.chatService.findConversationById(id);
@@ -70,6 +71,7 @@ export class ChatController {
   }
 
   @Post()
+  @UseGuards(JwtAuthGuard)
   async createConversation(@Body() body: any, @Request() req) {
     try {
       const userId = req.user?.sub || req.user?.userId;
@@ -112,6 +114,7 @@ export class ChatController {
   }
 
   @Get(':id/messages')
+  @UseGuards(JwtAuthGuard)
   async getMessages(@Param('id') conversationId: string, @Request() req) {
     try {
       console.log('[ChatController] getMessages endpoint called - conversationId:', conversationId);
@@ -130,6 +133,7 @@ export class ChatController {
   }
 
   @Post('messages')
+  @UseGuards(JwtAuthGuard)
   async sendMessage(@Body() body: any, @Request() req) {
     try {
       const userId = req.user?.sub || req.user?.userId;
@@ -157,6 +161,7 @@ export class ChatController {
   }
 
   @Delete(':id')
+  @UseGuards(JwtAuthGuard)
   async deleteConversation(@Param('id') id: string, @Request() req) {
     try {
       const userId = req.user?.sub || req.user?.userId;
@@ -171,6 +176,7 @@ export class ChatController {
   }
 
   @Post(':id/accept')
+  @UseGuards(JwtAuthGuard)
   async acceptConversation(@Param('id') id: string, @Request() req) {
     try {
       const userId = req.user?.sub || req.user?.userId;
@@ -188,6 +194,7 @@ export class ChatController {
 
   // Nickname endpoints
   @Post(':id/nicknames')
+  @UseGuards(JwtAuthGuard)
   async setNickname(
     @Param('id') conversationId: string,
     @Body() body: { targetUserId: number; nickname: string },
@@ -239,6 +246,7 @@ export class ChatController {
   }
 
   @Delete(':id/nicknames/:targetUserId')
+  @UseGuards(JwtAuthGuard)
   async removeNickname(
     @Param('id') conversationId: string,
     @Param('targetUserId') targetUserId: string,
@@ -285,6 +293,7 @@ export class ChatController {
   }
 
   @Get(':id/nicknames')
+  @UseGuards(JwtAuthGuard)
   async getNicknames(@Param('id') conversationId: string, @Request() req) {
     try {
       const userId = req.user?.sub || req.user?.userId;
