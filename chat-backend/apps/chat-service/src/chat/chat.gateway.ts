@@ -7,10 +7,9 @@ import {
   OnGatewayInit,
   MessageBody,
   ConnectedSocket,
-  Optional,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { Logger, UnauthorizedException, Inject } from '@nestjs/common';
+import { Logger, UnauthorizedException, Inject, Optional } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ClientProxy } from '@nestjs/microservices';
 import { ChatService } from './chat.service';
