@@ -3,30 +3,41 @@ import {
   CanActivate,
   ExecutionContext,
   UnauthorizedException,
+  Logger,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
+  private readonly logger = new Logger(JwtAuthGuard.name);
+
   constructor(private jwtService: JwtService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    this.logger.log('[JwtAuthGuard] canActivate called');
     const request = context.switchToHttp().getRequest();
     const token = this.extractToken(request);
 
+    this.logger.log('[JwtAuthGuard] Token extracted: ' + (token ? 'yes' : 'no'));
+
     if (!token) {
+      this.logger.warn('[JwtAuthGuard] No token provided');
       throw new UnauthorizedException('No token provided');
     }
 
     try {
+      this.logger.log('[JwtAuthGuard] Verifying token...');
       const payload = await this.jwtService.verifyAsync(token, {
         secret: process.env.JWT_ACCESS_SECRET || 'supersecret_access',
       });
-      
+
+      this.logger.log('[JwtAuthGuard] Token verified, user_id: ' + payload.sub);
+
       // Attach user to request
       request.user = payload;
       return true;
     } catch (error) {
+      this.logger.error('[JwtAuthGuard] Token verification failed: ' + error.message);
       throw new UnauthorizedException('Invalid token');
     }
   }

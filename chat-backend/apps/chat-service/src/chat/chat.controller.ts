@@ -13,6 +13,7 @@ import {
 import { ChatService } from './chat.service';
 import { SocketService } from './socket.service';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
+import { Public } from '@app/common';
 
 @Controller('conversations')
 @UseGuards(JwtAuthGuard)
@@ -22,15 +23,33 @@ export class ChatController {
     private readonly socketService: SocketService,
   ) {}
 
+  // Public test endpoint to verify HTTP routes are working
+  @Get('test-public')
+  @Public()
+  testPublic() {
+    console.log('[ChatController] test-public endpoint called');
+    return {
+      message: 'Chat Service HTTP routes are working!',
+      timestamp: new Date().toISOString(),
+    };
+  }
+
   @Get()
   async getConversations(@Request() req) {
+    console.log('[ChatController] getConversations called');
     try {
       const userId = req.user?.sub || req.user?.userId;
+      console.log('[ChatController] userId from request:', userId);
       if (!userId) {
+        console.log('[ChatController] No userId found, throwing 401');
         throw new HttpException('User ID not found', HttpStatus.UNAUTHORIZED);
       }
-      return await this.chatService.findConversationsByUser(userId);
+      console.log('[ChatController] Calling chatService.findConversationsByUser');
+      const result = await this.chatService.findConversationsByUser(userId);
+      console.log('[ChatController] chatService returned, conversations:', result?.length || 0);
+      return result;
     } catch (error) {
+      console.error('[ChatController] Error:', error.message, error.stack);
       throw new HttpException(
         error.message || 'Failed to fetch conversations',
         error.status || HttpStatus.INTERNAL_SERVER_ERROR,
