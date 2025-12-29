@@ -1,6 +1,5 @@
 import { useEffect } from 'react'
 import type { ReactNode } from 'react'
-import { Navigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/authStore'
 import { authService } from '@/services/authService'
 
@@ -16,7 +15,7 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
     const checkAuth = async () => {
       // Check if we have accessToken in sessionStorage
       const hasToken = sessionStorage.getItem('access_token')
-      
+
       if (!hasToken) {
         // No token, user not authenticated
         setUser(null)
@@ -39,6 +38,14 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
     checkAuth()
   }, [setUser, setLoading])
 
+  // Use window.location.hash to navigate (works with HashRouter)
+  useEffect(() => {
+    // Navigate to login if not authenticated (use window.location for HashRouter)
+    if (!isLoading && !isAuthenticated) {
+      window.location.hash = '#/login'
+    }
+  }, [isLoading, isAuthenticated])
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -48,7 +55,7 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />
+    return null // Will navigate in useEffect
   }
 
   return <>{children}</>

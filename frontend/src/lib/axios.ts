@@ -4,16 +4,21 @@ import axios from 'axios'
 const axiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:3000',
   timeout: 10000,
-  withCredentials: true, // Important: Send cookies with requests (HttpOnly cookies)
+  withCredentials: true, // Still send cookies for fallback
   headers: {
     'Content-Type': 'application/json',
   },
 })
 
-// Request interceptor - no need to manually add token (cookies are auto-sent)
+// Request interceptor - add Authorization header from sessionStorage
 axiosInstance.interceptors.request.use(
   (config) => {
-    // Cookies are automatically sent with withCredentials: true
+    // Try to get token from sessionStorage first (for cross-domain)
+    const token = sessionStorage.getItem('access_token')
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
+    // Cookies are also sent automatically with withCredentials: true (fallback)
     return config
   },
   (error) => {
@@ -34,18 +39,27 @@ axiosInstance.interceptors.response.use(
       originalRequest._retry = true
 
       try {
-        // Call refresh endpoint via Gateway (refreshToken is sent automatically via cookie)
-        await axios.post(
+        // Call refresh endpoint via Gateway
+        const refreshResponse = await axios.post(
           `${import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:3000'}/auth/refresh`,
           {},
           { withCredentials: true }
         )
 
-        // Cookies are updated by backend, retry original request
+        // Extract new access token from response
+        const newAccessToken = refreshResponse.data?.accessToken
+        if (newAccessToken) {
+          // Update sessionStorage
+          sessionStorage.setItem('access_token', newAccessToken)
+          // Update header for original request
+          originalRequest.headers.Authorization = `Bearer ${newAccessToken}`
+        }
+
+        // Retry original request
         return axiosInstance(originalRequest)
       } catch (refreshError) {
-        // Refresh failed, redirect to login
-        window.location.href = '/login'
+        // Refresh failed, dispatch custom event to trigger logout
+        window.dispatchEvent(new CustomEvent('auth:failed'))
         return Promise.reject(refreshError)
       }
     }
