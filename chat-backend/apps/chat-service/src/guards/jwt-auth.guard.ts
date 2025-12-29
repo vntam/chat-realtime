@@ -19,9 +19,11 @@ export class JwtAuthGuard implements CanActivate {
     const token = this.extractToken(request);
 
     this.logger.log('[JwtAuthGuard] Token extracted: ' + (token ? 'yes' : 'no'));
+    this.logger.log('[JwtAuthGuard] Authorization header: ' + (request.headers?.authorization ? 'present' : 'missing'));
+    this.logger.log('[JwtAuthGuard] Cookies: ' + (request.cookies ? JSON.stringify(Object.keys(request.cookies)) : 'none'));
 
     if (!token) {
-      this.logger.warn('[JwtAuthGuard] No token provided');
+      this.logger.warn('[JwtAuthGuard] No token provided, throwing UnauthorizedException');
       throw new UnauthorizedException('No token provided');
     }
 
