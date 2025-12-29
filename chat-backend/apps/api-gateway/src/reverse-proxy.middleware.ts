@@ -47,6 +47,12 @@ export function createReverseProxyMiddleware(
           proxyReq.setHeader('cookie', req.headers.cookie);
         }
 
+        // CRITICAL: Forward Authorization header to downstream services
+        // This is required for Bearer token authentication
+        if (req.headers.authorization) {
+          proxyReq.setHeader('authorization', req.headers.authorization);
+        }
+
         console.log(`[ReverseProxy] [${req.id}] Proxy ${req.method} ${req.originalUrl} → ${target}${path}${req.path}`);
       },
       proxyRes: (proxyRes, req: any) => {
