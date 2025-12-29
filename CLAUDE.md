@@ -124,6 +124,23 @@ npm run preview             # Preview production build locally
 npm run lint                # Run ESLint (does not auto-fix)
 ```
 
+### Auto-Deployment Scripts (Root directory)
+```bash
+# Quick git push (backend auto-deploys on Render)
+git-push.bat "commit message"        # Add, commit, push to GitHub
+
+# Deploy frontend to S3 only
+deploy-s3-quick.bat                   # Build + deploy frontend to S3
+
+# Full deploy (git + S3)
+auto-deploy.bat "commit message"      # Git push + S3 deploy in one command
+```
+
+**Auto-Deployment Flow:**
+1. **Backend changes:** Run `git-push.bat "message"` → Render auto-deploys all services
+2. **Frontend changes:** Run `deploy-s3-quick.bat` → Updates S3 immediately
+3. **Both changed:** Run `auto-deploy.bat "message"` → Does both in one go
+
 **Note**: Frontend is an ESM project (`"type": "module"` in package.json). Use `.js` extensions in imports, not `.ts`.
 
 ### Docker Commands
