@@ -15,16 +15,12 @@ export function createReverseProxyMiddleware(
     target,
     changeOrigin: true,
     pathRewrite: (reqPath: string, req: any) => {
-      // Express strips the prefix before passing to middleware
-      // We need to add it back for downstream services
-      // Example: /auth/login → /login (stripped) → /auth/login (add back)
-      // IMPORTANT: req.path is the STRIPPED path (without prefix)
-      // If req.path is '/', just return the prefix (no trailing slash)
-      // Otherwise, return prefix + req.path
-      if (req.path === '/') {
-        return path; // Return '/conversations' not '/conversations/'
-      }
-      return path + req.path; // '/conversations' + '/123' = '/conversations/123'
+      // http-proxy-middleware automatically prepends the path to target
+      // We just need to return the path portion WITHOUT the prefix
+      // Example: /conversations → Express strips to / → return / (or empty)
+      // Example: /conversations/123 → Express strips to /123 → return /123
+      // Just return req.path directly - http-proxy-middleware handles the rest
+      return req.path;
     },
     ws: false, // WebSocket handled separately
     on: {
@@ -53,7 +49,7 @@ export function createReverseProxyMiddleware(
           proxyReq.setHeader('authorization', req.headers.authorization);
         }
 
-        console.log(`[ReverseProxy] [${req.id}] Proxy ${req.method} ${req.originalUrl} → ${target}${path}${req.path}`);
+        console.log(`[ReverseProxy] [${req.id}] Proxy ${req.method} ${req.originalUrl} → ${target}${req.path}`);
       },
       proxyRes: (proxyRes, req: any) => {
         proxyRes.headers['x-trace-id'] = req.id;
