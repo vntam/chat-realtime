@@ -1,12 +1,4 @@
-import axios from 'axios'
 import axiosInstance from '@/lib/axios'
-
-// Get direct Chat Service URL for file upload (bypass Gateway for multipart/form-data)
-const getChatServiceUrl = () => {
-  // Remove protocol and convert http://chat-service to https://chat-service
-  const wsUrl = import.meta.env.VITE_CHAT_WS_URL || 'http://localhost:3002'
-  return wsUrl.replace('ws://', 'http://').replace('wss://', 'https://')
-}
 
 export interface User {
   user_id: number
