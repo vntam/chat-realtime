@@ -24,22 +24,14 @@ import { Nickname, NicknameSchema } from './schemas/nickname.schema';
       secret: process.env.JWT_ACCESS_SECRET || 'supersecret_access',
       signOptions: { expiresIn: '15m' },
     }),
+    // RabbitMQ client for publishing async events to Notification Service
+    // Connection is lazy and won't block startup if RabbitMQ is unavailable
     ClientsModule.register([
-      {
-        name: 'USER_SERVICE',
-        transport: Transport.TCP,
-        options: {
-          host: process.env.USER_SERVICE_HOST || 'localhost',
-          port: parseInt(process.env.USER_SERVICE_PORT || '3001'),
-        },
-      },
       {
         name: 'NOTIFICATION_SERVICE',
         transport: Transport.RMQ,
         options: {
-          urls: [
-            process.env.RABBITMQ_URL || 'amqp://guest:guest@localhost:5672',
-          ],
+          urls: [process.env.RABBITMQ_URL || 'amqp://guest:guest@localhost:5672'],
           queue: 'notification_queue',
           queueOptions: {
             durable: true,
@@ -47,6 +39,7 @@ import { Nickname, NicknameSchema } from './schemas/nickname.schema';
         },
       },
     ]),
+    // NOTE: User Service communication via HTTP through API Gateway, not TCP
   ],
   controllers: [ChatController],
   providers: [ChatService, ChatGateway, SocketService],
