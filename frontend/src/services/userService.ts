@@ -82,6 +82,7 @@ export const userService = {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
+      timeout: 60000, // 60 seconds for file upload to S3
     })
     console.log('[userService] uploadAvatar response:', response.data)
     return response.data
