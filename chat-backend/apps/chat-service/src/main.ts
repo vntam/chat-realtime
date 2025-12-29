@@ -49,12 +49,30 @@ async function bootstrap(): Promise<void> {
 
   // Use PORT for Render compatibility, fallback to CHAT_SERVICE_PORT or 3002
   const port = process.env.PORT ?? process.env.CHAT_SERVICE_PORT ?? 3002;
+
+  console.log(`🎯 About to listen on port ${port}...`);
+
   await app.listen(port, '0.0.0.0');
 
+  console.log(`✅ HTTP Server is NOW listening on port ${port}`);
   console.log(`🚀 Chat Service running on: http://0.0.0.0:${port}`);
   console.log(`📚 WS Docs available at: http://0.0.0.0:${port}/ws-docs`);
   console.log(`🔌 WebSocket namespace: ws://0.0.0.0:${port}/chat`);
   console.log(`📦 MongoDB: Connected to chat_db`);
+  console.log(`🌐 Testing HTTP server...`);
+
+  // Test HTTP server by making a simple HTTP request to itself
+  try {
+    const httpServer = app.getHttpAdapter().getInstance();
+    const server = httpServer?.httpServer;
+    if (server) {
+      console.log(`✅ HTTP Server instance found and listening`);
+      console.log(`🔧 Server listening: ${server.listening ? 'YES' : 'NO'}`);
+      console.log(`🔧 Server port: ${server.address()?.port}`);
+    }
+  } catch (error) {
+    console.error(`❌ Error checking HTTP server:`, error.message);
+  }
 }
 
 void bootstrap();

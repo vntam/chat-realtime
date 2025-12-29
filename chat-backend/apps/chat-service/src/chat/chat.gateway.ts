@@ -38,6 +38,8 @@ interface WsAck {
 
 @WebSocketGateway({
   namespace: '/chat',
+  serveClient: false, // Don't serve Socket.IO client JS (avoids conflict with HTTP routes)
+  path: '/socket.io', // Explicit path for WebSocket
   cors: {
     origin: process.env.ALLOWED_ORIGINS?.split(',') || [
       'http://localhost:3000',
