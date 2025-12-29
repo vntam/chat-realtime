@@ -73,6 +73,7 @@ export const userService = {
   },
 
   // Upload avatar - use Base64 encoding to avoid multipart/form-data issues
+  // Endpoint is in User Service (not Chat Service) to avoid routing issues
   uploadAvatar: async (file: File): Promise<{ url: string }> => {
     console.log('[userService] uploadAvatar called for file:', file.name, 'size:', file.size)
 
@@ -97,9 +98,9 @@ export const userService = {
 
     console.log('[userService] File converted to Base64, size:', base64.length)
 
-    // Use Gateway with Base64 (no multipart needed)
-    const response = await axiosInstance.post<{ url: string }>(
-      '/upload/avatar-base64',
+    // Call User Service endpoint via Gateway (avoids /upload routing issues)
+    const response = await axiosInstance.post<{ url: string; user: User }>(
+      '/users/upload-avatar',
       {
         fileName: file.name,
         mimeType: file.type,
