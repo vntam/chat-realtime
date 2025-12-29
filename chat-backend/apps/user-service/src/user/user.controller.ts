@@ -18,7 +18,6 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { UsersService } from './user.service';
-import { v4 as uuidv4 } from 'uuid';
 
 import {
   CreateUserDto,
@@ -150,16 +149,15 @@ export class UsersController {
       throw new BadRequestException(`File type ${body.mimeType} is not allowed`);
     }
 
-    // Generate mock URL (using UUID)
-    const fileExtension = body.fileName.split('.').pop() || 'jpg';
-    const mockUrl = `http://localhost:3001/uploads/avatars/${userId}/${uuidv4()}.${fileExtension}`;
-    this.logger.log(`[UsersController] Generated avatar URL: ${mockUrl}`);
+    // Generate Data URL (base64) - file will be embedded in URL, no storage needed
+    const dataUrl = `data:${body.mimeType};base64,${body.base64}`;
+    this.logger.log(`[UsersController] Generated avatar Data URL, length: ${dataUrl.length}`);
 
     // Update user's avatar_url in database
-    const user = await this.usersService.updateAvatarUrl(userId, mockUrl);
+    const user = await this.usersService.updateAvatarUrl(userId, dataUrl);
     this.logger.log(`[UsersController] Avatar updated for user ${userId}`);
 
-    return { url: mockUrl, user };
+    return { url: dataUrl, user };
   }
 
   // roles
