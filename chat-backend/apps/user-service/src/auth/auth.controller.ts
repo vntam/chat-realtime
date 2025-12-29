@@ -20,6 +20,7 @@ export class AuthController {
     this.setAccessCookie(res, result.accessToken);
     return {
       msg: result.msg,
+      user: result.user,
       accessToken: result.accessToken,
     };
   }
@@ -35,6 +36,7 @@ export class AuthController {
     this.setAccessCookie(res, result.accessToken);
     return {
       msg: result.msg,
+      user: result.user,
       accessToken: result.accessToken,
     };
   }
