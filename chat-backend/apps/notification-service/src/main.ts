@@ -72,7 +72,8 @@ async function bootstrap() {
   // Start all services
   await app.startAllMicroservices();
 
-  const port = process.env.NOTIFICATION_SERVICE_PORT || 3003;
+  // Use PORT for Render compatibility, fallback to NOTIFICATION_SERVICE_PORT or 3003
+  const port = process.env.PORT ?? process.env.NOTIFICATION_SERVICE_PORT ?? 3003;
   await app.listen(port, '0.0.0.0');
 
   console.log(`🚀 Notification Service running on: http://0.0.0.0:${port}`);
