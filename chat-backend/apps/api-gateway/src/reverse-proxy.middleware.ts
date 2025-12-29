@@ -28,6 +28,10 @@ export function createReverseProxyMiddleware(
     ws: false, // WebSocket handled separately
     on: {
       proxyReq: (proxyReq, req: any) => {
+        // Debug: Log all headers
+        console.log(`[ReverseProxy] [${req.id}] Incoming headers:`, Object.keys(req.headers || {}).join(', '));
+        console.log(`[ReverseProxy] [${req.id}] Authorization present:`, !!req.headers?.authorization);
+
         // Forward trace-id and user info from gateway to downstream
         if (req.id) {
           proxyReq.setHeader('x-trace-id', req.id as string);
@@ -50,6 +54,9 @@ export function createReverseProxyMiddleware(
         // This is required for Bearer token authentication
         if (req.headers.authorization) {
           proxyReq.setHeader('authorization', req.headers.authorization);
+          console.log(`[ReverseProxy] [${req.id}] Forwarding Authorization header:`, req.headers.authorization.substring(0, 20) + '...');
+        } else {
+          console.warn(`[ReverseProxy] [${req.id}] NO Authorization header to forward!`);
         }
 
         console.log(`[ReverseProxy] [${req.id}] Proxy ${req.method} ${req.originalUrl} → ${target}${req.path}`);
