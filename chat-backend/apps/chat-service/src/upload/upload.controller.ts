@@ -23,6 +23,12 @@ import { UploadService } from './upload.service';
 import { AuthGuard } from '@app/common/guards/auth.guard';
 import { GetCurrentUser } from '@app/common/decorators/get-current-user.decorator';
 
+interface UploadBase64Dto {
+  fileName: string;
+  mimeType: string;
+  base64: string;
+}
+
 @ApiTags('File Upload')
 @ApiBearerAuth()
 @UseGuards(AuthGuard)
@@ -31,6 +37,56 @@ export class UploadController {
   private readonly logger = new Logger(UploadController.name);
 
   constructor(private readonly uploadService: UploadService) {}
+
+  @Post('avatar-base64')
+  @ApiOperation({ summary: 'Upload avatar as Base64 (avoids multipart issues)' })
+  @ApiResponse({
+    status: 201,
+    description: 'Avatar uploaded successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string' },
+      },
+    },
+  })
+  async uploadAvatarBase64(
+    @Body() dto: UploadBase64Dto,
+    @GetCurrentUser('sub') userId?: number,
+  ) {
+    this.logger.log(`[UploadController] uploadAvatarBase64 called - userId: ${userId}`);
+    this.logger.log(`[UploadController] fileName: ${dto.fileName}, size: ${dto.base64.length}`);
+
+    if (!dto.base64 || !dto.fileName) {
+      throw new BadRequestException('Missing required fields');
+    }
+
+    // Convert Base64 to Buffer
+    const buffer = Buffer.from(dto.base64, 'base64');
+
+    // Create mock Multer file object
+    const file: Express.Multer.File = {
+      fieldname: 'file',
+      originalname: dto.fileName,
+      encoding: 'base64',
+      mimetype: dto.mimeType,
+      size: buffer.length,
+      buffer: buffer,
+      stream: null as any,
+      destination: '',
+      filename: '',
+      path: '',
+    };
+
+    const folderPath = `avatars/${userId}`;
+    this.logger.log(`[UploadController] Starting Base64 upload to folder: ${folderPath}`);
+
+    const fileUrl = await this.uploadService.uploadFile(file, folderPath);
+
+    this.logger.log(`[UploadController] Base64 upload successful: ${fileUrl}`);
+
+    return { url: fileUrl };
+  }
 
   @Post('single')
   @ApiOperation({ summary: 'Upload a single file' })

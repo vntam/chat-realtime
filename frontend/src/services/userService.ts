@@ -80,33 +80,41 @@ export const userService = {
     return response.data
   },
 
-  // Upload avatar - direct to Chat Service (bypass Gateway for multipart/form-data)
+  // Upload avatar - use Base64 encoding to avoid multipart/form-data issues
   uploadAvatar: async (file: File): Promise<{ url: string }> => {
     console.log('[userService] uploadAvatar called for file:', file.name, 'size:', file.size)
 
-    // Get token from sessionStorage
-    const token = sessionStorage.getItem('access_token')
-    if (!token) {
-      throw new Error('No authentication token found')
+    // Check file size limit (500KB for Base64 upload)
+    const MAX_SIZE = 500 * 1024 // 500KB
+    if (file.size > MAX_SIZE) {
+      throw new Error(`File size must be less than ${MAX_SIZE / 1024}KB for avatar upload`)
     }
 
-    const formData = new FormData()
-    formData.append('file', file)
+    // Convert file to Base64
+    const base64 = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        const result = reader.result as string
+        // Remove data:image/...;base64, prefix
+        const base64Data = result.split(',')[1]
+        resolve(base64Data)
+      }
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
 
-    // Call Chat Service directly (not through Gateway) to avoid multipart proxy issues
-    const chatServiceUrl = getChatServiceUrl()
-    console.log('[userService] Uploading directly to Chat Service:', chatServiceUrl)
+    console.log('[userService] File converted to Base64, size:', base64.length)
 
-    const response = await axios.post<{ url: string }>(
-      `${chatServiceUrl}/upload/single?folder=avatars`,
-      formData,
+    // Use Gateway with Base64 (no multipart needed)
+    const response = await axiosInstance.post<{ url: string }>(
+      '/upload/avatar-base64',
       {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-          'Authorization': `Bearer ${token}`,
-        },
-        timeout: 60000, // 60 seconds for file upload to S3
-        withCredentials: true,
+        fileName: file.name,
+        mimeType: file.type,
+        base64: base64,
+      },
+      {
+        timeout: 30000, // 30 seconds
       }
     )
     console.log('[userService] uploadAvatar response:', response.data)
