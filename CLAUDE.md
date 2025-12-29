@@ -245,8 +245,44 @@ frontend/
 ### REST API Routes (via Gateway)
 - `/auth/*` → User Service (login, register, refresh)
 - `/users/*`, `/roles/*` → User Service
-- `/conversations/*`, `/upload` → Chat Service (upload uses AWS S3)
+  - `POST /users/upload-avatar` - Avatar upload (Base64, avoids multipart issues)
+- `/conversations/*` → Chat Service
+- `/upload/*` → Chat Service (file uploads, currently disabled for debugging)
 - `/notifications/*` → Notification Service
+
+### Avatar Upload Implementation (Completed Dec 2025)
+**Architecture:**
+- Endpoint: `POST /users/upload-avatar` in **User Service** (not Chat Service)
+- **Why User Service?** POST requests to `/upload/*` path were being blocked before reaching Gateway
+- **Base64 Encoding:** File converted to Base64 on frontend, sent as JSON (avoids multipart/form-data issues)
+- **Data URL Storage:** Avatar stored as `data:image/jpeg;base64,...` in database (no S3 required for small files)
+
+**Frontend Flow:**
+1. User selects file in Settings page
+2. File converted to Base64 using FileReader (max 500KB)
+3. POST to `/users/upload-avatar` with `{fileName, mimeType, base64}`
+4. Response: `{url: "data:image/jpeg;base64,...", user: {...}}`
+5. User record updated with new avatar_url
+
+**Backend Implementation:**
+- `user.controller.ts` (line 124-162): `uploadAvatar()` endpoint
+- `user.service.ts` (line 216-230): `updateAvatarUrl()` method
+- Validation: File size (500KB max), MIME type (images only)
+
+**Realtime Avatar Updates:**
+- `ChatMessages.tsx` fetches latest avatars for all senders when displaying messages
+- Avatars update in realtime across all old messages when user changes profile picture
+- Uses `/users/batch` endpoint to fetch multiple users efficiently
+
+**Files Modified:**
+- `chat-backend/apps/user-service/src/user/user.controller.ts`
+- `chat-backend/apps/user-service/src/user/user.service.ts`
+- `frontend/src/services/userService.ts`
+- `frontend/src/components/chat/ChatMessages.tsx`
+
+**Known Issues:**
+- Data URLs increase database size (avatar embedded as base64 string)
+- Future improvement: Upload to S3 and store S3 URL instead
 
 ### WebSocket Namespaces
 - **Chat Service**: `/chat` - Events: `message:send`, `message:created`, `conversation:join`, `typing`
@@ -382,6 +418,19 @@ import type { ReactNode } from 'react';
 import type { FormEvent } from 'react';
 ```
 
+### Avatar Upload Issues (Resolved)
+**Issue 1: Upload timeout (60s)**
+- Cause: `multipart/form-data` requests blocked by http-proxy-middleware or Render load balancer
+- Solution: Convert file to Base64, send as JSON to User Service
+
+**Issue 2: Avatar not displaying (localhost URL)**
+- Cause: Mock URL `http://localhost:3001/uploads/...` returned instead of real file
+- Solution: Return Data URL `data:image/jpeg;base64,...` instead
+
+**Issue 3: Avatar not updating in chat messages**
+- Cause: Avatar cached in `message.sender?.avatar_url` when message sent
+- Solution: Fetch latest avatars via `/users/batch` when rendering messages
+
 ### Mock Mode Development
 Frontend supports mock mode for development without backend:
 - Set `VITE_ENABLE_MOCK=true` in frontend/.env
@@ -396,3 +445,23 @@ Frontend supports mock mode for development without backend:
 - **DOCKER_GUIDE.md** - Comprehensive Docker deployment guide
 - **AWS_EC2_DEPLOYMENT.md** - AWS EC2 production deployment guide
 - **DEPLOYMENT_PROGRESS.md** - Deployment progress tracking
+
+## Recent Changes (Dec 2025 - Avatar Upload Feature)
+
+### Commits
+- `cfa3712` - Add avatar upload endpoint to User Service
+- `94b7592` - Update frontend to use new avatar upload endpoint
+- `eb4069` - Fix avatar upload to use Data URL instead of mock URL
+- `1eb695e` - Fix sender avatar display in chat messages (realtime updates)
+
+### Summary
+Avatar upload feature is now fully functional:
+- Users can upload profile pictures via Settings page
+- Avatars stored as Data URLs (base64 encoded)
+- Realtime avatar updates across all chat messages
+- Max file size: 500KB
+- Supported formats: JPEG, PNG, GIF, WebP
+
+### Deployment
+- Frontend: https://chatrealtime-frontend-s3-2025.s3-website-ap-southeast-1.amazonaws.com
+- All backend services: Deployed on Render (auto-deploy on git push)
