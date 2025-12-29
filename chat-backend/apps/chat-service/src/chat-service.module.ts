@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
+import { HttpModule } from '@nestjs/axios';
 import { ChatModule } from './chat/chat.module';
 import { UploadModule } from './upload/upload.module';
 import { HealthModule } from './health/health.module';
@@ -17,6 +18,7 @@ import { MetricsInterceptor } from './metrics/metrics.interceptor';
     MongooseModule.forRoot(
       process.env.CHAT_DB_URL || 'mongodb://localhost:27017/chat-service',
     ),
+    HttpModule,
     MetricsModule,
     ChatModule,
     UploadModule,

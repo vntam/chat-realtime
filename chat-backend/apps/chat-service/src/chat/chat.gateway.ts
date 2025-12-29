@@ -12,6 +12,7 @@ import { Server, Socket } from 'socket.io';
 import { Logger, UnauthorizedException, Inject, Optional } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ClientProxy } from '@nestjs/microservices';
+import { HttpService } from '@nestjs/axios';
 import { ChatService } from './chat.service';
 import { SocketService } from './socket.service';
 import {
@@ -60,6 +61,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
     private readonly jwtService: JwtService,
     private readonly metricsService: MetricsService,
     private readonly socketService: SocketService,
+    private readonly httpService: HttpService,
     @Optional() @Inject('NOTIFICATION_SERVICE')
     private readonly notificationClient: ClientProxy,
   ) {
@@ -127,6 +129,32 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
     const sockets = this.server.sockets.sockets;
     const activeConnections = sockets.size;
     this.metricsService.setActiveConnections(activeConnections);
+  }
+
+  /**
+   * Fetch sender info from User Service
+   * Returns user data with user_id, username, avatar_url, status, created_at
+   */
+  private async fetchSenderInfo(
+    userId: number,
+  ): Promise<{ id: string; name: string; avatar_url?: string } | null> {
+    try {
+      const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:3001';
+      const response = await this.httpService.axiosRef.get(
+        `${userServiceUrl}/users/${userId}`,
+      );
+      const user = response.data;
+      return {
+        id: String(user.user_id),
+        name: user.username,
+        avatar_url: user.avatar_url,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Failed to fetch user ${userId}: ${error.response?.data?.message || error.message}`,
+      );
+      return null;
+    }
   }
 
   private ack(
@@ -546,9 +574,13 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
         payload.conversationId,
       );
 
+      // Fetch sender info for avatar display
+      const sender = await this.fetchSenderInfo(message.sender_id);
+
       const messageData = {
         _id: message._id.toString(),
         sender_id: message.sender_id,
+        sender: sender, // Include sender info with avatar_url
         conversation_id: message.conversation_id.toString(),
         content: message.content,
         attachments: message.attachments,
@@ -603,12 +635,16 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
         client.userId!,
       );
 
+      // Fetch sender info for avatar display
+      const sender = await this.fetchSenderInfo(message.sender_id);
+
       // Broadcast update to conversation room
       this.server
         .to(`conversation:${message.conversation_id.toString()}`)
         .emit('message:updated', {
           _id: message._id.toString(),
           sender_id: message.sender_id,
+          sender: sender, // Include sender info with avatar_url
           content: message.content,
           attachments: message.attachments,
           seen_by: message.seen_by,
