@@ -9,6 +9,7 @@ import {
   Query,
   BadRequestException,
   Body,
+  Logger,
 } from '@nestjs/common';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import {
@@ -27,6 +28,8 @@ import { GetCurrentUser } from '@app/common/decorators/get-current-user.decorato
 @UseGuards(AuthGuard)
 @Controller('upload')
 export class UploadController {
+  private readonly logger = new Logger(UploadController.name);
+
   constructor(private readonly uploadService: UploadService) {}
 
   @Post('single')
@@ -50,12 +53,20 @@ export class UploadController {
     @Query('folder') folder?: string,
     @GetCurrentUser('sub') userId?: number,
   ) {
+    this.logger.log(`[UploadController] uploadSingleFile called - userId: ${userId}, folder: ${folder}`);
+    this.logger.log(`[UploadController] file: ${file?.originalname}, size: ${file?.size}, mimetype: ${file?.mimetype}`);
+
     if (!file) {
+      this.logger.error('[UploadController] No file provided!');
       throw new BadRequestException('No file provided');
     }
 
     const folderPath = folder || `attachments/${userId}`;
+    this.logger.log(`[UploadController] Starting upload to folder: ${folderPath}`);
+
     const fileUrl = await this.uploadService.uploadFile(file, folderPath);
+
+    this.logger.log(`[UploadController] Upload successful: ${fileUrl}`);
 
     return {
       url: fileUrl,
