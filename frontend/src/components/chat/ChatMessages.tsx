@@ -54,6 +54,7 @@ export default function ChatMessages() {
   const { messages, selectedConversation, getTypingUsers, getNickname } = useChatStore()
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [readUsers, setReadUsers] = useState<Map<string, UserAvatar[]>>(new Map())
+  const [senderAvatars, setSenderAvatars] = useState<Map<number, string>>(new Map())
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const markedAsReadRef = useRef<Set<string>>(new Set())
   // Track which users have already been animated (messageId_userId) - using ref to avoid re-renders
@@ -141,6 +142,39 @@ export default function ChatMessages() {
     }
   }, [messages])
 
+  // Fetch latest avatars for all senders in conversation (to show updated avatars)
+  useEffect(() => {
+    const fetchSenderAvatars = async () => {
+      // Get all unique sender IDs from messages
+      const senderIds = new Set<number>()
+      for (const message of messages) {
+        if (message.sender?.id) {
+          senderIds.add(parseInt(message.sender.id))
+        }
+      }
+
+      if (senderIds.size === 0) return
+
+      try {
+        const users = await userService.getUsersByIds(Array.from(senderIds))
+        const avatarMap = new Map<number, string>()
+
+        users.forEach((user) => {
+          if (user.avatar_url) {
+            avatarMap.set(user.user_id, user.avatar_url)
+          }
+        })
+
+        setSenderAvatars(avatarMap)
+        console.log('[ChatMessages] Updated sender avatars:', avatarMap)
+      } catch (error) {
+        console.error('[ChatMessages] Failed to fetch sender avatars:', error)
+      }
+    }
+
+    fetchSenderAvatars()
+  }, [messages])
+
   const formatTime = (dateString: string) => {
     const date = new Date(dateString)
     return date.toLocaleTimeString('vi-VN', {
@@ -195,10 +229,13 @@ export default function ChatMessages() {
           : null
         const displayName = nickname || message.sender?.name || 'Unknown'
 
+        // Use fetched avatar (latest) instead of cached avatar from message
+        const latestAvatar = senderIdNum ? senderAvatars.get(senderIdNum) : null
+
         groups.push({
           senderId,
           senderName: displayName,
-          senderAvatar: message.sender?.avatar_url,
+          senderAvatar: latestAvatar || message.sender?.avatar_url,
           isOwn,
           messages: [message],
         })
