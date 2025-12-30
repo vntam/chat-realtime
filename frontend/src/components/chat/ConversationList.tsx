@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Search, Plus, MoreVertical, Pin, BellOff } from 'lucide-react'
+import { Search, Plus, Pin, BellOff } from 'lucide-react'
 import { chatService } from '@/services/chatService'
 import type { Conversation } from '@/services/chatService'
 import { userService } from '@/services/userService'
@@ -8,7 +8,6 @@ import { useAuthStore } from '@/store/authStore'
 import Input from '@/components/ui/Input'
 import Button from '@/components/ui/Button'
 import CreateConversationModal from '@/components/chat/CreateConversationModal'
-import ConversationMenu from '@/components/chat/ConversationMenu'
 import MembersModal from '@/components/chat/MembersModal'
 import Avatar from '@/components/ui/Avatar'
 
@@ -18,7 +17,6 @@ export default function ConversationList() {
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [showCreateModal, setShowCreateModal] = useState(false)
-  const [activeMenuId, setActiveMenuId] = useState<string | null>(null)
   const [showMembersModal, setShowMembersModal] = useState(false)
 
   useEffect(() => {
@@ -296,7 +294,6 @@ export default function ConversationList() {
             const lastMessageTime = conversation.lastMessage?.createdAt
               ? formatTime(conversation.lastMessage.createdAt)
               : ''
-            const showMenu = activeMenuId === conversation.id
             const settings = conversationSettings.get(conversation.id) || {}
 
             return (
@@ -382,30 +379,7 @@ export default function ConversationList() {
                       </p>
                     )}
                   </div>
-
-                  {/* Menu button */}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setActiveMenuId(activeMenuId === conversation.id ? null : conversation.id)
-                    }}
-                    className="flex-shrink-0 p-1 rounded-full hover:bg-gray-200 dark:hover:bg-[#3a3b3c] transition-colors opacity-0 group-hover:opacity-100"
-                  >
-                    <MoreVertical className="w-4 h-4 text-gray-500 dark:text-[#b0b3b8]" />
-                  </button>
                 </button>
-
-                {/* Context Menu */}
-                {showMenu && (
-                  <ConversationMenu
-                    conversation={conversation}
-                    onClose={() => setActiveMenuId(null)}
-                    onOpenMembers={() => {
-                      setActiveMenuId(null)
-                      setShowMembersModal(true)
-                    }}
-                  />
-                )}
               </div>
             )
           })

@@ -8,6 +8,7 @@ import { initializeSocket, getSocket } from '@/lib/socket'
 import ChatMessages from '@/components/chat/ChatMessages'
 import ChatInput from '@/components/chat/ChatInput'
 import MembersModal from '@/components/chat/MembersModal'
+import ConversationMenu from '@/components/chat/ConversationMenu'
 import Button from '@/components/ui/Button'
 import Avatar from '@/components/ui/Avatar'
 
@@ -21,7 +22,7 @@ export default function ChatBox() {
   const { user } = useAuthStore()
   const { selectedConversation, setMessages, setupWebSocketListeners, markConversationAsRead, setNicknames, loadMessagesFromStorage, getNickname } = useChatStore()
   const [showMembersModal, setShowMembersModal] = useState(false)
-  const [showOptionsMenu, setShowOptionsMenu] = useState(false)
+  const [showMenu, setShowMenu] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   // Store realtime participant info (fetched from API)
   const [participantInfos, setParticipantInfos] = useState<Map<number, ParticipantInfo>>(new Map())
@@ -55,7 +56,7 @@ export default function ChatBox() {
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setShowOptionsMenu(false)
+        setShowMenu(false)
       }
     }
 
@@ -391,32 +392,26 @@ export default function ChatBox() {
           </div>
         </div>
 
-        {/* Options Menu */}
+        {/* Options Menu Button */}
         <div className="relative" ref={menuRef}>
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setShowOptionsMenu(!showOptionsMenu)}
+            onClick={() => setShowMenu(!showMenu)}
           >
             <Settings className="w-4 h-4" />
           </Button>
 
-          {showOptionsMenu && (
-            <div className="absolute right-0 top-12 z-[10000] w-56 bg-white dark:bg-[#242526] rounded-lg shadow-xl border border-gray-200 dark:border-[#3a3b3c] overflow-hidden">
-              {/* Manage Members / Conversation - opens MembersModal with all features */}
-              <button
-                className="w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-100 dark:hover:bg-[#1c1e21] transition-colors text-left pointer-events-auto"
-                onClick={() => {
-                  setShowOptionsMenu(false)
-                  setShowMembersModal(true)
-                }}
-              >
-                <Users className="w-4 h-4 text-gray-500 dark:text-[#b0b3b8]" />
-                <span className="text-sm text-gray-900 dark:text-[#e4e6eb]">
-                  {selectedConversation.isGroup ? 'Thành viên' : 'Đặt biệt danh'}
-                </span>
-              </button>
-            </div>
+          {/* Full Conversation Menu */}
+          {showMenu && (
+            <ConversationMenu
+              conversation={selectedConversation}
+              onClose={() => setShowMenu(false)}
+              onOpenMembers={() => {
+                setShowMenu(false)
+                setShowMembersModal(true)
+              }}
+            />
           )}
         </div>
       </div>
