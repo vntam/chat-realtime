@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { MessageType } from './schemas/message.schema';
 import { InjectModel } from '@nestjs/mongoose';
@@ -30,6 +31,7 @@ import {
 
 @Injectable()
 export class ChatService {
+  private readonly logger = new Logger(ChatService.name);
   private readonly defaultPageSize: number;
   private readonly maxPageSize: number;
 
