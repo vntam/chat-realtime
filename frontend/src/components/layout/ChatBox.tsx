@@ -270,7 +270,7 @@ export default function ChatBox() {
         </div>
 
         {/* Options Menu */}
-        <div className="relative" ref={menuRef}>
+        <div className="relative z-50" ref={menuRef}>
           <Button
             variant="outline"
             size="sm"
@@ -280,7 +280,7 @@ export default function ChatBox() {
           </Button>
 
           {showOptionsMenu && (
-            <div className="absolute right-0 top-12 z-50 w-56 bg-white dark:bg-[#242526] rounded-lg shadow-xl border border-gray-200 dark:border-[#3a3b3c] overflow-hidden">
+            <div className="absolute right-0 top-12 z-[10000] w-56 bg-white dark:bg-[#242526] rounded-lg shadow-xl border border-gray-200 dark:border-[#3a3b3c] overflow-hidden">
               {/* Manage Members / Conversation - opens MembersModal with all features */}
               <button
                 className="w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-100 dark:hover:bg-[#1c1e21] transition-colors text-left"

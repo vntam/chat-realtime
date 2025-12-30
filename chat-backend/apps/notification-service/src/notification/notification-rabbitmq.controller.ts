@@ -99,6 +99,11 @@ export class NotificationRabbitMQController {
         messageIcon = '📎 ';
       }
 
+      // Build enhanced title with sender name
+      const enhancedTitle = data.conversation_name
+        ? `${senderName}: ${data.conversation_name}`
+        : `${senderName}: ${data.title}`;
+
       // Create enhanced notification in database
       this.logger.debug(
         `[DB] Creating notification for user ${data.user_id}...`,
@@ -106,7 +111,7 @@ export class NotificationRabbitMQController {
       const notification = await this.notificationService.create({
         user_id: data.user_id,
         type: data.type,
-        title: data.title,
+        title: enhancedTitle,
         content: messageIcon + data.content,
         related_id: data.related_id,
         sender_id: data.sender_id,

@@ -2,12 +2,14 @@ import { useEffect } from 'react'
 import { Outlet } from 'react-router-dom'
 import { initializeSocket, initializeNotificationSocket, getNotificationSocket } from '@/lib/socket'
 import { useNotificationStore } from '@/store/notificationStore'
+import { useToastStore } from '@/store/toastStore'
 import type { Notification } from '@/services/notificationService'
 import Header from './Header'
 import Sidebar from './Sidebar'
 
 export default function MainLayout() {
   const { addNotification, setUnreadCount } = useNotificationStore()
+  const { addToast } = useToastStore()
 
   useEffect(() => {
     const token = sessionStorage.getItem('access_token')
@@ -24,6 +26,14 @@ export default function MainLayout() {
         notificationSocket.on('notification:created', (notification: Notification) => {
           console.log('New notification received:', notification)
           addNotification(notification)
+
+          // Show toast popup notification
+          addToast({
+            title: notification.title,
+            message: notification.content,
+            type: 'info',
+            duration: 5000,
+          })
         })
 
         // Listen for unread count updates
@@ -53,7 +63,7 @@ export default function MainLayout() {
         notificationSocket.off('notification:deleted')
       }
     }
-  }, [addNotification, setUnreadCount])
+  }, [addNotification, setUnreadCount, addToast])
 
   return (
     <div className="h-screen flex flex-col bg-gray-50 dark:bg-[#1c1e21] transition-colors duration-200">
@@ -62,11 +72,13 @@ export default function MainLayout() {
 
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar */}
-        <Sidebar />
+        {/* Sidebar - higher z-index to stay on top */}
+        <div className="relative z-20">
+          <Sidebar />
+        </div>
 
-        {/* Content Area */}
-        <main className="flex-1 flex overflow-hidden">
+        {/* Content Area - lower z-index */}
+        <main className="flex-1 flex overflow-hidden relative z-10">
           <Outlet />
         </main>
       </div>
