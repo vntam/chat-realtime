@@ -4,8 +4,8 @@ import {
   ForbiddenException,
   BadRequestException,
   Logger,
-  HttpService,
 } from '@nestjs/common';
+import { HttpService } from '@nestjs/axios';
 import { MessageType } from './schemas/message.schema';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
