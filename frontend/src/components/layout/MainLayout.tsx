@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { Outlet } from 'react-router-dom'
-import { initializeSocket, getSocket, initializeNotificationSocket, getNotificationSocket } from '@/lib/socket'
+import { initializeSocket, initializeNotificationSocket, getNotificationSocket } from '@/lib/socket'
 import { useNotificationStore } from '@/store/notificationStore'
 import type { Notification } from '@/services/notificationService'
 import Header from './Header'
