@@ -26,7 +26,17 @@ export class NotificationRabbitMQController {
     private readonly httpService: HttpService,
   ) {
     this.logger.log('NotificationRabbitMQController initialized');
-    this.userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:3001';
+    // Auto-detect User Service URL based on environment
+    if (process.env.USER_SERVICE_URL) {
+      this.userServiceUrl = process.env.USER_SERVICE_URL;
+    } else if (process.env.RENDER) {
+      // Running on Render - use internal service name
+      this.userServiceUrl = 'http://chat-user-service:3001';
+    } else {
+      // Local development
+      this.userServiceUrl = 'http://localhost:3001';
+    }
+    this.logger.log(`User Service URL configured: ${this.userServiceUrl}`);
   }
 
   /**
@@ -40,6 +50,7 @@ export class NotificationRabbitMQController {
       return response.data;
     } catch (error) {
       this.logger.error(`Failed to fetch user ${userId}: ${error.message}`);
+      this.logger.debug(`User Service URL: ${this.userServiceUrl}`);
       return null;
     }
   }

@@ -23,6 +23,10 @@ export class MetricsInterceptor implements NestInterceptor {
     return next.handle().pipe(
       tap({
         next: () => {
+          // Skip metrics for non-HTTP contexts (e.g., RabbitMQ events)
+          if (!request || !request.path) {
+            return;
+          }
           const response = context.switchToHttp().getResponse();
           const duration = Date.now() - startTime;
 
@@ -34,6 +38,10 @@ export class MetricsInterceptor implements NestInterceptor {
           );
         },
         error: (error) => {
+          // Skip metrics for non-HTTP contexts (e.g., RabbitMQ events)
+          if (!request || !request.path) {
+            return;
+          }
           const duration = Date.now() - startTime;
           const statusCode = error.status || 500;
 
@@ -49,6 +57,7 @@ export class MetricsInterceptor implements NestInterceptor {
   }
 
   private sanitizePath(path: string): string {
+    if (!path) return 'unknown';
     return path
       .replace(/\/[0-9a-f]{24}/gi, '/:id') // MongoDB ObjectID
       .replace(/\/\d+/g, '/:id') // Numeric IDs
