@@ -253,7 +253,7 @@ export default function ChatBox() {
   return (
     <div className="flex-1 flex flex-col bg-gradient-to-b from-gray-50 dark:from-[#1c1e21] to-white dark:to-[#242526]">
       {/* Chat Header */}
-      <div className="h-16 bg-white/80 dark:bg-[#242526]/80 backdrop-blur-xl border-b border-gray-200 dark:border-[#3a3b3c] px-6 flex items-center justify-between shadow-sm">
+      <div className="h-16 bg-white/80 dark:bg-[#242526]/80 backdrop-blur-xl border-b border-gray-200 dark:border-[#3a3b3c] px-6 flex items-center justify-between shadow-sm relative z-20">
         <div className="flex items-center gap-3">
           <Avatar
             username={getConversationName()}
@@ -270,7 +270,7 @@ export default function ChatBox() {
         </div>
 
         {/* Options Menu */}
-        <div className="relative z-50" ref={menuRef}>
+        <div className="relative" ref={menuRef}>
           <Button
             variant="outline"
             size="sm"
@@ -283,7 +283,7 @@ export default function ChatBox() {
             <div className="absolute right-0 top-12 z-[10000] w-56 bg-white dark:bg-[#242526] rounded-lg shadow-xl border border-gray-200 dark:border-[#3a3b3c] overflow-hidden">
               {/* Manage Members / Conversation - opens MembersModal with all features */}
               <button
-                className="w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-100 dark:hover:bg-[#1c1e21] transition-colors text-left"
+                className="w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-100 dark:hover:bg-[#1c1e21] transition-colors text-left pointer-events-auto"
                 onClick={() => {
                   setShowOptionsMenu(false)
                   setShowMembersModal(true)

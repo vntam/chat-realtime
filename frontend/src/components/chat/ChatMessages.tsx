@@ -13,6 +13,11 @@ interface UserAvatar {
   avatar_url?: string
 }
 
+interface SenderInfo {
+  username: string
+  avatar_url?: string
+}
+
 interface MessageGroup {
   senderId: string
   senderName: string
@@ -54,7 +59,7 @@ export default function ChatMessages() {
   const { messages, selectedConversation, getTypingUsers, getNickname } = useChatStore()
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [readUsers, setReadUsers] = useState<Map<string, UserAvatar[]>>(new Map())
-  const [senderAvatars, setSenderAvatars] = useState<Map<number, string>>(new Map())
+  const [senderInfos, setSenderInfos] = useState<Map<number, SenderInfo>>(new Map())
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const markedAsReadRef = useRef<Set<string>>(new Set())
   // Track which users have already been animated (messageId_userId) - using ref to avoid re-renders
@@ -142,9 +147,9 @@ export default function ChatMessages() {
     }
   }, [messages])
 
-  // Fetch latest avatars for all senders in conversation (to show updated avatars)
+  // Fetch latest info (username + avatar) for all senders in conversation (realtime updates)
   useEffect(() => {
-    const fetchSenderAvatars = async () => {
+    const fetchSenderInfos = async () => {
       // Get all unique sender IDs from messages
       const senderIds = new Set<number>()
       for (const message of messages) {
@@ -157,22 +162,23 @@ export default function ChatMessages() {
 
       try {
         const users = await userService.getUsersByIds(Array.from(senderIds))
-        const avatarMap = new Map<number, string>()
+        const infoMap = new Map<number, SenderInfo>()
 
         users.forEach((user) => {
-          if (user.avatar_url) {
-            avatarMap.set(user.user_id, user.avatar_url)
-          }
+          infoMap.set(user.user_id, {
+            username: user.username,
+            avatar_url: user.avatar_url,
+          })
         })
 
-        setSenderAvatars(avatarMap)
-        console.log('[ChatMessages] Updated sender avatars:', avatarMap)
+        setSenderInfos(infoMap)
+        console.log('[ChatMessages] Updated sender infos:', infoMap)
       } catch (error) {
-        console.error('[ChatMessages] Failed to fetch sender avatars:', error)
+        console.error('[ChatMessages] Failed to fetch sender infos:', error)
       }
     }
 
-    fetchSenderAvatars()
+    fetchSenderInfos()
   }, [messages])
 
   const formatTime = (dateString: string) => {
@@ -227,10 +233,18 @@ export default function ChatMessages() {
         const nickname = !isOwn && senderIdNum && selectedConversation
           ? getNickname(selectedConversation.id, senderIdNum)
           : null
-        const displayName = nickname || message.sender?.name || 'Unknown'
 
-        // Use fetched avatar (latest) instead of cached avatar from message
-        const latestAvatar = senderIdNum ? senderAvatars.get(senderIdNum) : null
+        // Get realtime sender info (username + avatar) from fetched data
+        const senderInfo = senderIdNum ? senderInfos.get(senderIdNum) : null
+
+        // For own messages, use current username from authStore (realtime update)
+        // For other users' messages, use fetched username (realtime) or nickname or cached name
+        const displayName = isOwn
+          ? user?.username || 'Bạn'
+          : (nickname || senderInfo?.username || message.sender?.name || 'Unknown')
+
+        // Use fetched avatar (latest) from realtime data
+        const latestAvatar = senderInfo?.avatar_url
 
         groups.push({
           senderId,
