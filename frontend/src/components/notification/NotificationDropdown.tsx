@@ -30,12 +30,13 @@ export default function NotificationDropdown() {
           console.log('Received notification:', notification)
           addNotification(notification)
 
-          // Show toast notification
+          // Show toast notification with avatar
           addToast({
             title: notification.title,
             message: notification.content,
             type: 'info',
             duration: 5000,
+            avatarUrl: notification.sender_avatar,
           })
 
           // Play notification sound (optional)

@@ -27,12 +27,13 @@ export default function MainLayout() {
           console.log('New notification received:', notification)
           addNotification(notification)
 
-          // Show toast popup notification
+          // Show toast popup notification with avatar
           addToast({
             title: notification.title,
             message: notification.content,
             type: 'info',
             duration: 5000,
+            avatarUrl: notification.sender_avatar,
           })
         })
 

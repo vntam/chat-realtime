@@ -6,6 +6,7 @@ export interface Toast {
   message: string
   type: 'info' | 'success' | 'warning' | 'error'
   duration?: number
+  avatarUrl?: string
 }
 
 interface ToastState {

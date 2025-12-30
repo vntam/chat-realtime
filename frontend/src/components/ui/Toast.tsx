@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { X, Bell, CheckCircle, AlertTriangle, AlertCircle } from 'lucide-react'
 import { useToastStore, type Toast } from '@/store/toastStore'
+import Avatar from './Avatar'
 
 export default function ToastContainer() {
   const { toasts, removeToast } = useToastStore()
@@ -52,7 +53,19 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
       className={`pointer-events-auto w-80 rounded-lg border shadow-lg p-4 animate-slide-in-right ${getColorClasses()}`}
     >
       <div className="flex items-start gap-3">
-        <div className="flex-shrink-0 mt-0.5">{getIcon()}</div>
+        {/* Show avatar if available, otherwise show icon */}
+        {toast.avatarUrl ? (
+          <div className="flex-shrink-0">
+            <Avatar
+              src={toast.avatarUrl}
+              username={toast.title}
+              size="sm"
+              className="shadow-md"
+            />
+          </div>
+        ) : (
+          <div className="flex-shrink-0 mt-0.5">{getIcon()}</div>
+        )}
         <div className="flex-1 min-w-0">
           <h4 className="font-semibold text-sm text-gray-900 dark:text-[#e4e6eb] mb-1">{toast.title}</h4>
           <p className="text-sm text-gray-700 dark:text-gray-300 line-clamp-2">{toast.message}</p>

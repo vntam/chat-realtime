@@ -392,7 +392,7 @@ export default function ChatMessages() {
   const groupedMessages = groupMessagesByDate(messages)
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-thin bg-gray-50 dark:bg-[#1c1e21]">
+    <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-thin bg-gray-50 dark:bg-[#1c1e21] relative z-0">
       {/* Image Modal */}
       {selectedImage && (
         <div
