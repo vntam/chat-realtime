@@ -3,7 +3,7 @@ import axios from 'axios'
 // Create axios instance - route qua API Gateway
 const axiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:3000',
-  timeout: 10000,
+  timeout: 30000, // 30s timeout for cold start on Render
   withCredentials: true, // Still send cookies for fallback
   headers: {
     'Content-Type': 'application/json',
