@@ -66,6 +66,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
     private readonly notificationClient: ClientProxy,
   ) {
     this.logger.log('ChatGateway initialized with notification client: ' + !!notificationClient);
+    this.logger.log('[DEBUG] RABBITMQ_URL: ' + (process.env.RABBITMQ_URL ? 'SET' : 'NOT SET'));
+    this.logger.log('[DEBUG] NotificationClient available: ' + (this.notificationClient ? 'YES' : 'NO'));
   }
 
   afterInit(server: Server) {
@@ -1029,13 +1031,13 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
   ): void {
     // Skip RabbitMQ notifications for now - they were causing HTTP routes to timeout
     if (!this.notificationClient) {
-      this.logger.debug(`[Notification] Skipping - notification client not available`);
+      this.logger.warn(`[Notification] ❌ notificationClient is UNDEFINED! Check RabbitMQ setup.`);
       return;
     }
 
     try {
-      this.logger.debug(
-        `[Notification] Starting to send notifications for conversation ${conversationId}, sender ${senderId}`,
+      this.logger.log(
+        `[Notification] ✅ Starting to send notifications for conversation ${conversationId}, sender ${senderId}`,
       );
 
       // Get conversation to find participants
