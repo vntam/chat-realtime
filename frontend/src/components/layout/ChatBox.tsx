@@ -376,7 +376,7 @@ export default function ChatBox() {
   return (
     <div className="flex-1 flex flex-col bg-gradient-to-b from-gray-50 dark:from-[#1c1e21] to-white dark:to-[#242526]">
       {/* Chat Header */}
-      <div className="h-16 bg-white/80 dark:bg-[#242526]/80 backdrop-blur-xl border-b border-gray-200 dark:border-[#3a3b3c] px-6 flex items-center justify-between shadow-sm relative z-20">
+      <div className="h-16 bg-white/80 dark:bg-[#242526]/80 backdrop-blur-xl border-b border-gray-200 dark:border-[#3a3b3c] px-6 flex items-center justify-between shadow-sm relative z-50">
         <div className="flex items-center gap-3">
           <Avatar
             username={getConversationName()}

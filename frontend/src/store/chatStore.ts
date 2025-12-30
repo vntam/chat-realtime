@@ -270,6 +270,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   addMessage: (message) =>
     set((state) => {
+      // CRITICAL: Only add message if it belongs to the currently selected conversation
+      if (!state.selectedConversation || message.conversationId !== state.selectedConversation.id) {
+        console.log('[chatStore] Ignoring message from different conversation:', message.conversationId, 'current:', state.selectedConversation?.id)
+        return state
+      }
+
       // Deduplicate: check if message already exists
       const exists = state.messages.some((m) => m.id === message.id)
       if (exists) {

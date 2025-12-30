@@ -221,7 +221,7 @@ export default function ConversationMenu({
     <>
       <div
         ref={menuRef}
-        className="absolute right-2 top-12 z-[100] w-56 bg-white dark:bg-[#242526] rounded-lg shadow-xl border border-gray-200 dark:border-[#3a3b3c] overflow-hidden"
+        className="absolute right-0 top-12 z-[99999] w-56 bg-white dark:bg-[#242526] rounded-lg shadow-xl border border-gray-200 dark:border-[#3a3b3c] overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {MENU_ITEMS.map((item, index) => (
