@@ -471,7 +471,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }),
 
   setBlockedUsers: (blockedUsers) =>
-    set((state) => {
+    set(() => {
       // Persist to localStorage
       saveBlockedUsersToStorage(blockedUsers)
       return { blockedUsers }

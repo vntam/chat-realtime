@@ -4,17 +4,15 @@ import { useChatStore } from '@/store/chatStore'
 import { conversationSettingsService } from '@/services/conversationSettingsService'
 import { userService } from '@/services/userService'
 import { useAuthStore } from '@/store/authStore'
-import { useNavigate } from 'react-router-dom'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
+import { Dialog, DialogContent, DialogBody } from '@/components/ui/Dialog'
+import Button from '@/components/ui/Button'
+
+interface MenuItem {
+  icon: any
+  label: string
+  action: () => void
+  variant?: 'danger'
+}
 
 interface ConversationMenuProps {
   conversation: any
@@ -134,80 +132,90 @@ export default function ConversationMenu({
     onClose()
   }
 
-  const MENU_ITEMS = [
-    // View Profile (private chat only)
-    !isGroup && {
+  const MENU_ITEMS: MenuItem[] = []
+
+  // View Profile (private chat only)
+  if (!isGroup) {
+    MENU_ITEMS.push({
       icon: User,
       label: 'Xem trang cá nhân',
       action: () => {
         // TODO: Open profile modal
         onClose()
       },
-    },
+    })
+  }
 
-    // Members / Set Nickname
-    isGroup ? {
+  // Members / Set Nickname
+  if (isGroup) {
+    MENU_ITEMS.push({
       icon: Users,
       label: 'Thành viên',
       action: onOpenMembers,
-    } : !isGroup && {
+    })
+  } else {
+    MENU_ITEMS.push({
       icon: Users,
       label: 'Đặt biệt danh',
       action: onOpenMembers,
-    },
+    })
+  }
 
-    // Mark as Read (only if unread)
-    isUnread && {
+  // Mark as Read (only if unread)
+  if (isUnread) {
+    MENU_ITEMS.push({
       icon: Check,
       label: 'Đánh dấu đã đọc',
       action: handleMarkAsRead,
-    },
+    })
+  }
 
-    // Pin / Unpin
-    {
-      icon: settings.pinned ? PinOff : Pin,
-      label: settings.pinned ? 'Bỏ ghim cuộc trò chuyện' : 'Ghim cuộc trò chuyện',
-      action: handleTogglePin,
-    },
+  // Pin / Unpin
+  MENU_ITEMS.push({
+    icon: settings.pinned ? PinOff : Pin,
+    label: settings.pinned ? 'Bỏ ghim cuộc trò chuyện' : 'Ghim cuộc trò chuyện',
+    action: handleTogglePin,
+  })
 
-    // Mute / Unmute
-    {
-      icon: settings.muted ? Bell : BellOff,
-      label: settings.muted ? 'Bật thông báo' : 'Tắt thông báo',
-      action: handleToggleMute,
-    },
+  // Mute / Unmute
+  MENU_ITEMS.push({
+    icon: settings.muted ? Bell : BellOff,
+    label: settings.muted ? 'Bật thông báo' : 'Tắt thông báo',
+    action: handleToggleMute,
+  })
 
-    // Hide conversation
-    {
-      icon: EyeOff,
-      label: 'Ẩn cuộc trò chuyện',
-      action: handleHide,
-    },
+  // Hide conversation
+  MENU_ITEMS.push({
+    icon: EyeOff,
+    label: 'Ẩn cuộc trò chuyện',
+    action: handleHide,
+  })
 
-    // Block user (private chat only)
-    !isGroup && {
+  // Block user (private chat only)
+  if (!isGroup) {
+    MENU_ITEMS.push({
       icon: Ban,
       label: 'Chặn người dùng',
       action: handleBlockUser,
-      variant: 'danger' as const,
-    },
+      variant: 'danger',
+    })
+  }
 
-    // Clear chat history
-    {
-      icon: Trash2,
-      label: 'Xóa lịch sử trò chuyện',
-      action: () => setShowClearDialog(true),
-      variant: 'danger' as const,
-    },
+  // Clear chat history
+  MENU_ITEMS.push({
+    icon: Trash2,
+    label: 'Xóa lịch sử trò chuyện',
+    action: () => setShowClearDialog(true),
+    variant: 'danger',
+  })
 
-    // Delete conversation
-    {
-      icon: X,
-      label: isGroup ? 'Xóa cuộc trò chuyện' : 'Xóa cuộc trò chuyện',
-      action: () => setShowDeleteDialog(true),
-      variant: 'danger' as const,
-    },
-  ].filter(Boolean)
+  // Delete conversation
+  MENU_ITEMS.push({
+    icon: X,
+    label: isGroup ? 'Xóa cuộc trò chuyện' : 'Xóa cuộc trò chuyện',
+    action: () => setShowDeleteDialog(true),
+    variant: 'danger',
+  })
 
   return (
     <>
@@ -233,44 +241,46 @@ export default function ConversationMenu({
       </div>
 
       {/* Clear History Confirmation Dialog */}
-      <AlertDialog open={showClearDialog} onOpenChange={setShowClearDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Xóa lịch sử trò chuyện?</AlertDialogTitle>
-            <AlertDialogDescription>
+      <Dialog open={showClearDialog} onClose={() => setShowClearDialog(false)}>
+        <DialogContent>
+          <DialogBody>
+            <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-[#e4e6eb]">Xóa lịch sử trò chuyện?</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
               Điều này sẽ xóa tất cả tin nhắn trong cuộc trò chuyện này cho bạn. Những người tham gia khác vẫn sẽ thấy tin nhắn.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Hủy</AlertDialogCancel>
-            <AlertDialogAction onClick={handleClearHistory} className="bg-red-600 hover:bg-red-700">
-              Xóa lịch sử
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={() => setShowClearDialog(false)}>
+                Hủy
+              </Button>
+              <Button className="bg-red-600 hover:bg-red-700 text-white" onClick={handleClearHistory}>
+                Xóa lịch sử
+              </Button>
+            </div>
+          </DialogBody>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Conversation Confirmation Dialog */}
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {isGroup ? 'Xóa cuộc trò chuyện?' : 'Xóa cuộc trò chuyện?'}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
+      <Dialog open={showDeleteDialog} onClose={() => setShowDeleteDialog(false)}>
+        <DialogContent>
+          <DialogBody>
+            <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-[#e4e6eb]">Xóa cuộc trò chuyện?</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
               {isGroup
                 ? 'Chỉ quản trị viên mới có thể xóa cuộc trò chuyện nhóm. Hành động này sẽ xóa nhóm và tất cả tin nhắn cho tất cả thành viên.'
                 : 'Cuộc trò chuyện sẽ bị ẩn đối với bạn. Người khác vẫn sẽ thấy cuộc trò chuyện này.'}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Hủy</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteConversation} className="bg-red-600 hover:bg-red-700">
-              {isGroup ? 'Xóa nhóm' : 'Xóa cuộc trò chuyện'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
+                Hủy
+              </Button>
+              <Button className="bg-red-600 hover:bg-red-700 text-white" onClick={handleDeleteConversation}>
+                {isGroup ? 'Xóa nhóm' : 'Xóa cuộc trò chuyện'}
+              </Button>
+            </div>
+          </DialogBody>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }
