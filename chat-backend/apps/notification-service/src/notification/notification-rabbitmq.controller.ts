@@ -30,8 +30,8 @@ export class NotificationRabbitMQController {
     if (process.env.USER_SERVICE_URL) {
       this.userServiceUrl = process.env.USER_SERVICE_URL;
     } else if (process.env.RENDER) {
-      // Running on Render - use internal service name
-      this.userServiceUrl = 'http://chat-user-service:3001';
+      // Running on Render - use public URL (services not in same private network)
+      this.userServiceUrl = 'https://chat-user-service-ftge.onrender.com';
     } else {
       // Local development
       this.userServiceUrl = 'http://localhost:3001';

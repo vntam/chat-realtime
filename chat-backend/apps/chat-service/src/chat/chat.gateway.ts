@@ -141,7 +141,18 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
     userId: number,
   ): Promise<{ id: string; name: string; avatar_url?: string } | null> {
     try {
-      const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:3001';
+      // Auto-detect User Service URL based on environment
+      let userServiceUrl = process.env.USER_SERVICE_URL;
+      if (!userServiceUrl) {
+        if (process.env.RENDER) {
+          // Running on Render - use public URL
+          userServiceUrl = 'https://chat-user-service-ftge.onrender.com';
+        } else {
+          // Local development
+          userServiceUrl = 'http://localhost:3001';
+        }
+      }
+
       const response = await this.httpService.axiosRef.get(
         `${userServiceUrl}/users/${userId}`,
       );
