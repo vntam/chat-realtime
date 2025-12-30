@@ -324,6 +324,9 @@ export class ChatService {
       }
     }
 
+    // Debug: Log incoming content
+    this.logger.log(`[sendMessage] User ${senderId} sending message with content: "${dto.content}" (length: ${dto.content?.length})`)
+
     const message = new this.messageModel({
       conversation_id: new Types.ObjectId(conversationId),
       sender_id: senderId,
@@ -341,6 +344,9 @@ export class ChatService {
     });
 
     const savedMessage = await message.save();
+
+    // Debug: Log saved content
+    this.logger.log(`[sendMessage] Message saved with _id: ${savedMessage._id}, content: "${savedMessage.content}" (length: ${savedMessage.content?.length})`)
 
     // Update conversation with last_message_id
     await this.conversationModel.findByIdAndUpdate(

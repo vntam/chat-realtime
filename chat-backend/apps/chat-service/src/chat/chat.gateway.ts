@@ -590,6 +590,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
       // Fetch sender info for avatar display
       const sender = await this.fetchSenderInfo(message.sender_id);
 
+      // Debug: Log content before broadcast
+      this.logger.log(`[ChatGateway] Broadcasting message ${message._id} with content: "${message.content}" (length: ${message.content?.length})`)
+
       const messageData = {
         _id: message._id.toString(),
         sender_id: message.sender_id,
@@ -601,6 +604,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
         created_at: message.created_at,
         clientId: payload.clientId, // Echo back for client deduplication
       };
+
+      // Debug: Log messageData content
+      this.logger.log(`[ChatGateway] messageData.content = "${messageData.content}" (length: ${messageData.content?.length})`)
 
       // Broadcast to conversation room (for users who have joined)
       this.server.to(roomName).emit('message:created', messageData);
