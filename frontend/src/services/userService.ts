@@ -126,4 +126,22 @@ export const userService = {
   deleteUser: async (id: number): Promise<void> => {
     await axiosInstance.delete(`/users/${id}`)
   },
+
+  // Block user
+  blockUser: async (targetUserId: number): Promise<any> => {
+    const response = await axiosInstance.post(`/users/block/${targetUserId}`)
+    return response.data
+  },
+
+  // Unblock user
+  unblockUser: async (targetUserId: number): Promise<any> => {
+    const response = await axiosInstance.delete(`/users/block/${targetUserId}`)
+    return response.data
+  },
+
+  // Get blocked users list
+  getBlockedUsers: async (): Promise<User[]> => {
+    const response = await axiosInstance.get('/users/blocked')
+    return response.data
+  },
 }

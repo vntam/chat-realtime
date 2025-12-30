@@ -179,7 +179,7 @@ export default function ChatMessages() {
     }
 
     fetchSenderInfos()
-  }, [messages])
+  }, [selectedConversation?.id]) // Only fetch when conversation ID changes, NOT messages (to avoid infinite loop)
 
   const formatTime = (dateString: string) => {
     const date = new Date(dateString)
@@ -238,18 +238,18 @@ export default function ChatMessages() {
         const senderInfo = senderIdNum ? senderInfos.get(senderIdNum) : null
 
         // For own messages, use current username from authStore (realtime update)
-        // For other users' messages, use fetched username (realtime) or nickname or cached name
+        // For other users' messages, use nickname FIRST (highest priority), then fetched username (realtime), then cached name
         const displayName = isOwn
           ? user?.username || 'Bạn'
           : (nickname || senderInfo?.username || message.sender?.name || 'Unknown')
 
-        // Use fetched avatar (latest) from realtime data
-        const latestAvatar = senderInfo?.avatar_url
+        // Use fetched avatar (latest) from realtime data, then fallback to cached avatar
+        const latestAvatar = senderInfo?.avatar_url || message.sender?.avatar_url
 
         groups.push({
           senderId,
           senderName: displayName,
-          senderAvatar: latestAvatar || message.sender?.avatar_url,
+          senderAvatar: latestAvatar,
           isOwn,
           messages: [message],
         })

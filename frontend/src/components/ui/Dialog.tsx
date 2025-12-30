@@ -1,6 +1,7 @@
-import { useEffect } from 'react'
-import type { ReactNode } from 'react'
-import { X } from 'lucide-react'
+import { useEffect, useState, useRef, useCallback } from 'react'
+import { createPortal } from 'react-dom'
+import type { ReactNode, MouseEvent } from 'react'
+import { X, GripVertical } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Button from './Button'
 
@@ -8,9 +9,61 @@ interface DialogProps {
   open: boolean
   onClose: () => void
   children: ReactNode
+  draggable?: boolean
 }
 
-export function Dialog({ open, onClose, children }: DialogProps) {
+export function Dialog({ open, onClose, children, draggable = false }: DialogProps) {
+  const [position, setPosition] = useState({ x: 0, y: 0 })
+  const [isDragging, setIsDragging] = useState(false)
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
+  const contentRef = useRef<HTMLDivElement>(null)
+
+  // Reset position when dialog opens
+  useEffect(() => {
+    if (open) {
+      setPosition({ x: 0, y: 0 })
+    }
+  }, [open])
+
+  const handleMouseDown = useCallback((e: MouseEvent<HTMLDivElement>) => {
+    if (!draggable) return
+    // Only allow dragging from the header
+    const target = e.target as HTMLElement
+    if (!target.closest('.drag-handle')) return
+
+    setIsDragging(true)
+    setDragStart({
+      x: e.clientX - position.x,
+      y: e.clientY - position.y
+    })
+    e.preventDefault()
+  }, [draggable, position])
+
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (!isDragging) return
+
+    const newX = e.clientX - dragStart.x
+    const newY = e.clientY - dragStart.y
+
+    setPosition({ x: newX, y: newY })
+  }, [isDragging, dragStart])
+
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false)
+  }, [])
+
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove as any)
+      document.addEventListener('mouseup', handleMouseUp)
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove as any)
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [isDragging, handleMouseMove, handleMouseUp])
+
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
@@ -29,19 +82,30 @@ export function Dialog({ open, onClose, children }: DialogProps) {
 
   if (!open) return null
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+  const contentStyle = draggable && (position.x !== 0 || position.y !== 0)
+    ? { transform: `translate(${position.x}px, ${position.y}px)` }
+    : undefined
+
+  // Use Portal to render outside the sidebar/component hierarchy
+  return createPortal(
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-background/80 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={onClose}
       />
 
       {/* Dialog content */}
-      <div className="relative z-50 w-full max-w-lg mx-4">
+      <div
+        ref={contentRef}
+        className="relative z-[99999] w-full max-w-lg mx-4"
+        style={contentStyle}
+        onMouseDown={handleMouseDown}
+      >
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
@@ -57,6 +121,7 @@ export function DialogContent({ children, className }: DialogContentProps) {
         'bg-card border border-border rounded-lg shadow-lg',
         className
       )}
+      style={{ isolation: 'isolate' as any }}
     >
       {children}
     </div>
@@ -66,12 +131,21 @@ export function DialogContent({ children, className }: DialogContentProps) {
 interface DialogHeaderProps {
   children: ReactNode
   onClose?: () => void
+  draggable?: boolean
 }
 
-export function DialogHeader({ children, onClose }: DialogHeaderProps) {
+export function DialogHeader({ children, onClose, draggable = false }: DialogHeaderProps) {
   return (
-    <div className="flex items-center justify-between p-6 border-b border-border">
-      {children}
+    <div className={cn(
+      "flex items-center p-6 border-b border-border",
+      draggable ? "justify-between cursor-move drag-handle" : "justify-between"
+    )}>
+      <div className="flex items-center gap-2 flex-1">
+        {draggable && <GripVertical className="w-5 h-5 text-gray-400 cursor-move" />}
+        <div className="flex-1">
+          {children}
+        </div>
+      </div>
       {onClose && (
         <Button variant="ghost" size="sm" onClick={onClose}>
           <X className="w-4 h-4" />

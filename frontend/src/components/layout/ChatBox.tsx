@@ -261,7 +261,7 @@ export default function ChatBox() {
     }
 
     fetchParticipantInfos()
-  }, [selectedConversation?.id, selectedConversation?.participants])
+  }, [selectedConversation?.id]) // Only fetch when conversation ID changes, NOT participants (to avoid infinite loop)
 
   // Listen to user:profile-updated event to refresh participant infos in ChatHeader
   // Setup ONCE and persist across conversation changes

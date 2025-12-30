@@ -17,6 +17,21 @@ interface ChatState {
   typingUsers: Map<string, TypingUser[]> // conversationId -> typing users
   unreadCounts: Map<string, number> // conversationId -> unread count
   nicknames: Map<string, Map<number, string>> // conversationId -> (userId -> nickname)
+
+  // Conversation settings (per-user settings for each conversation)
+  conversationSettings: Map<string, {
+    muted?: boolean
+    mutedUntil?: Date
+    pinned?: boolean
+    pinnedOrder?: number
+    hidden?: boolean
+    hiddenAt?: Date
+    lastMessageCleared?: Date
+  }>
+
+  // Blocked users list
+  blockedUsers: number[]
+
   setConversations: (conversations: Conversation[]) => void
   addConversation: (conversation: Conversation) => void
   selectConversation: (conversation: Conversation | null) => void
@@ -33,6 +48,12 @@ interface ChatState {
   setNicknames: (conversationId: string, nicknames: Map<number, string>) => void
   setNickname: (conversationId: string, userId: number, nickname: string) => void
   getNickname: (conversationId: string, userId: number) => string | undefined
+
+  // Conversation settings actions
+  setConversationSettings: (conversationId: string, settings: any) => void
+  setBlockedUsers: (blockedUsers: number[]) => void
+  toggleBlockUser: (userId: number) => void
+
   setupWebSocketListeners: () => void
 }
 
@@ -51,6 +72,14 @@ let conversationNameUpdatedHandler: ((data: any) => void) | null = null
 let conversationModeratorUpdatedHandler: ((data: any) => void) | null = null
 let typingHandler: ((data: any) => void) | null = null
 let nicknameUpdatedHandler_local: ((data: any) => void) | null = null
+let userProfileUpdatedHandler: ((data: any) => void) | null = null
+// New handlers for conversation settings
+let conversationMutedHandler: ((data: any) => void) | null = null
+let conversationPinnedHandler: ((data: any) => void) | null = null
+let conversationHiddenHandler: ((data: any) => void) | null = null
+let conversationMessagesClearedHandler: ((data: any) => void) | null = null
+let userBlockedHandler: ((data: any) => void) | null = null
+let userUnblockedHandler: ((data: any) => void) | null = null
 
 // Set to track received message IDs for deduplication
 const receivedMessageIds = new Set<string>()
@@ -72,6 +101,76 @@ const loadNicknamesFromStorage = (): Map<string, Map<number, string>> => {
     console.error('[chatStore] Failed to load nicknames from localStorage:', e)
   }
   return new Map<string, Map<number, string>>()
+}
+
+// Load conversation settings from localStorage on initialization
+const loadConversationSettingsFromStorage = (): Map<string, {
+  muted?: boolean
+  mutedUntil?: Date
+  pinned?: boolean
+  pinnedOrder?: number
+  hidden?: boolean
+  hiddenAt?: Date
+  lastMessageCleared?: Date
+}> => {
+  try {
+    const stored = localStorage.getItem('conversation_settings')
+    if (stored) {
+      const parsed = JSON.parse(stored)
+      const settingsMap = new Map<string, any>()
+      parsed.forEach(([convId, settings]: [string, any]) => {
+        // Convert date strings back to Date objects
+        settingsMap.set(convId, {
+          ...settings,
+          mutedUntil: settings.mutedUntil ? new Date(settings.mutedUntil) : undefined,
+          hiddenAt: settings.hiddenAt ? new Date(settings.hiddenAt) : undefined,
+          lastMessageCleared: settings.lastMessageCleared ? new Date(settings.lastMessageCleared) : undefined,
+        })
+      })
+      console.log('[chatStore] Loaded conversation settings from localStorage:', settingsMap.size, 'conversations')
+      return settingsMap
+    }
+  } catch (e) {
+    console.error('[chatStore] Failed to load conversation settings from localStorage:', e)
+  }
+  return new Map()
+}
+
+// Load blocked users from localStorage on initialization
+const loadBlockedUsersFromStorage = (): number[] => {
+  try {
+    const stored = localStorage.getItem('blocked_users')
+    if (stored) {
+      const parsed = JSON.parse(stored)
+      console.log('[chatStore] Loaded blocked users from localStorage:', parsed.length, 'users')
+      return parsed
+    }
+  } catch (e) {
+    console.error('[chatStore] Failed to load blocked users from localStorage:', e)
+  }
+  return []
+}
+
+// Save conversation settings to localStorage
+const saveConversationSettingsToStorage = (settings: Map<string, any>) => {
+  try {
+    const serialized = JSON.stringify(Array.from(settings.entries()))
+    localStorage.setItem('conversation_settings', serialized)
+    console.log('[chatStore] Conversation settings saved to localStorage')
+  } catch (e) {
+    console.error('[chatStore] Failed to save conversation settings to localStorage:', e)
+  }
+}
+
+// Save blocked users to localStorage
+const saveBlockedUsersToStorage = (blockedUsers: number[]) => {
+  try {
+    const serialized = JSON.stringify(blockedUsers)
+    localStorage.setItem('blocked_users', serialized)
+    console.log('[chatStore] Blocked users saved to localStorage:', blockedUsers.length)
+  } catch (e) {
+    console.error('[chatStore] Failed to save blocked users to localStorage:', e)
+  }
 }
 
 // Save messages to localStorage
@@ -108,6 +207,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   typingUsers: new Map<string, TypingUser[]>(),
   unreadCounts: new Map<string, number>(),
   nicknames: loadNicknamesFromStorage(),
+  conversationSettings: loadConversationSettingsFromStorage(),
+  blockedUsers: loadBlockedUsersFromStorage(),
 
   setConversations: (conversations) => set(() => {
     // Populate lastMessage from localStorage cache if backend doesn't provide it
@@ -358,6 +459,35 @@ export const useChatStore = create<ChatState>((set, get) => ({
     return nickname
   },
 
+  // Conversation settings actions
+  setConversationSettings: (conversationId, settings) =>
+    set((state) => {
+      const newSettings = new Map(state.conversationSettings)
+      const currentSettings = newSettings.get(conversationId) || {}
+      newSettings.set(conversationId, { ...currentSettings, ...settings })
+      // Persist to localStorage
+      saveConversationSettingsToStorage(newSettings)
+      return { conversationSettings: newSettings }
+    }),
+
+  setBlockedUsers: (blockedUsers) =>
+    set((state) => {
+      // Persist to localStorage
+      saveBlockedUsersToStorage(blockedUsers)
+      return { blockedUsers }
+    }),
+
+  toggleBlockUser: (userId) =>
+    set((state) => {
+      const isBlocked = state.blockedUsers.includes(userId)
+      const newBlocked = isBlocked
+        ? state.blockedUsers.filter((id) => id !== userId)
+        : [...state.blockedUsers, userId]
+      // Persist to localStorage
+      saveBlockedUsersToStorage(newBlocked)
+      return { blockedUsers: newBlocked }
+    }),
+
   setupWebSocketListeners: () => {
     const socket = getSocket()
     if (!socket) {
@@ -388,6 +518,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       conversationModeratorUpdatedHandler = null
       typingHandler = null
       nicknameUpdatedHandler_local = null
+      userProfileUpdatedHandler = null
       receivedMessageIds.clear()
     }
 
@@ -433,6 +564,27 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
     if (nicknameUpdatedHandler_local) {
       socket.off('nickname:updated', nicknameUpdatedHandler_local)
+    }
+    if (userProfileUpdatedHandler) {
+      socket.off('user:profile-updated', userProfileUpdatedHandler)
+    }
+    if (conversationMutedHandler) {
+      socket.off('conversation:muted', conversationMutedHandler)
+    }
+    if (conversationPinnedHandler) {
+      socket.off('conversation:pinned', conversationPinnedHandler)
+    }
+    if (conversationHiddenHandler) {
+      socket.off('conversation:hidden', conversationHiddenHandler)
+    }
+    if (conversationMessagesClearedHandler) {
+      socket.off('conversation:messages-cleared', conversationMessagesClearedHandler)
+    }
+    if (userBlockedHandler) {
+      socket.off('user:blocked', userBlockedHandler)
+    }
+    if (userUnblockedHandler) {
+      socket.off('user:unblocked', userUnblockedHandler)
     }
 
     // Create stable handler that uses latest store functions
@@ -876,6 +1028,195 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
     }
 
+    // Handler for user profile updated events (avatar, username changes)
+    userProfileUpdatedHandler = (data: any) => {
+      console.log('Received user:profile-updated event:', data)
+
+      const { userId, username, avatar_url } = data
+      if (!userId) {
+        console.log('Invalid user:profile-updated data, ignoring')
+        return
+      }
+
+      // Update all messages from this user to reflect new avatar/username
+      set((state) => {
+        const updatedMessages = state.messages.map((msg) => {
+          if (msg.sender?.id === String(userId)) {
+            return {
+              ...msg,
+              sender: {
+                ...msg.sender,
+                name: username || msg.sender?.name,
+                avatar_url: avatar_url || msg.sender?.avatar_url,
+              },
+            }
+          }
+          return msg
+        })
+
+        // Update all conversations to reflect new participant info
+        const updatedConversations = state.conversations.map((conv) => {
+          // Update participants array
+          const updatedParticipants = conv.participants.map((p) => {
+            const pid = parseInt(String(p.id || p.user_id || '0'), 10)
+            if (pid === userId) {
+              return {
+                ...p,
+                name: username || p.name,
+                avatar_url: avatar_url || p.avatar_url,
+              }
+            }
+            return p
+          })
+
+          // Update lastMessage sender if applicable
+          let updatedLastMessage = conv.lastMessage
+          if (conv.lastMessage?.sender?.id === String(userId)) {
+            updatedLastMessage = {
+              ...conv.lastMessage,
+              sender: {
+                ...conv.lastMessage.sender,
+                name: username || conv.lastMessage.sender.name,
+                avatar_url: avatar_url || conv.lastMessage.sender.avatar_url,
+              },
+            }
+          }
+
+          return {
+            ...conv,
+            participants: updatedParticipants,
+            lastMessage: updatedLastMessage,
+          }
+        })
+
+        // Update selected conversation if it contains this user
+        let updatedSelected = state.selectedConversation
+        if (state.selectedConversation) {
+          const updatedParticipants = state.selectedConversation.participants.map((p) => {
+            const pid = parseInt(String(p.id || p.user_id || '0'), 10)
+            if (pid === userId) {
+              return {
+                ...p,
+                name: username || p.name,
+                avatar_url: avatar_url || p.avatar_url,
+              }
+            }
+            return p
+          })
+
+          let updatedLastMessage = state.selectedConversation.lastMessage
+          if (state.selectedConversation.lastMessage?.sender?.id === String(userId)) {
+            updatedLastMessage = {
+              ...state.selectedConversation.lastMessage,
+              sender: {
+                ...state.selectedConversation.lastMessage.sender,
+                name: username || state.selectedConversation.lastMessage.sender.name,
+                avatar_url: avatar_url || state.selectedConversation.lastMessage.sender.avatar_url,
+              },
+            }
+          }
+
+          updatedSelected = {
+            ...state.selectedConversation,
+            participants: updatedParticipants,
+            lastMessage: updatedLastMessage,
+          }
+        }
+
+        return {
+          messages: updatedMessages,
+          conversations: updatedConversations,
+          selectedConversation: updatedSelected,
+        }
+      })
+
+      console.log('User profile updated:', userId, username)
+    }
+
+    // Handler for conversation muted events
+    conversationMutedHandler = (data: any) => {
+      console.log('Received conversation:muted event:', data)
+      const { conversationId, muted, muteUntil } = data
+      if (conversationId) {
+        const state = get()
+        state.setConversationSettings(conversationId, {
+          muted,
+          mutedUntil: muteUntil ? new Date(muteUntil) : undefined,
+        })
+      }
+    }
+
+    // Handler for conversation pinned events
+    conversationPinnedHandler = (data: any) => {
+      console.log('Received conversation:pinned event:', data)
+      const { conversationId, pinned, order } = data
+      if (conversationId) {
+        const state = get()
+        state.setConversationSettings(conversationId, {
+          pinned,
+          pinnedOrder: order,
+        })
+      }
+    }
+
+    // Handler for conversation hidden events
+    conversationHiddenHandler = (data: any) => {
+      console.log('Received conversation:hidden event:', data)
+      const { conversationId, hidden } = data
+      if (conversationId) {
+        const state = get()
+        state.setConversationSettings(conversationId, {
+          hidden,
+          hiddenAt: hidden ? new Date() : undefined,
+        })
+
+        // If conversation was hidden, remove it from the list
+        if (hidden) {
+          set((state) => ({
+            conversations: state.conversations.filter((c) => c.id !== conversationId),
+            selectedConversation: state.selectedConversation?.id === conversationId ? null : state.selectedConversation,
+          }))
+        }
+      }
+    }
+
+    // Handler for conversation messages cleared events
+    conversationMessagesClearedHandler = (data: any) => {
+      console.log('Received conversation:messages-cleared event:', data)
+      const { conversationId } = data
+      if (conversationId) {
+        const state = get()
+        state.setConversationSettings(conversationId, {
+          lastMessageCleared: new Date(),
+        })
+
+        // Clear messages if the cleared conversation is currently selected
+        if (state.selectedConversation?.id === conversationId) {
+          state.clearMessages()
+        }
+      }
+    }
+
+    // Handler for user blocked events
+    userBlockedHandler = (data: any) => {
+      console.log('Received user:blocked event:', data)
+      const { targetUserId } = data
+      if (targetUserId) {
+        const state = get()
+        state.toggleBlockUser(targetUserId)
+      }
+    }
+
+    // Handler for user unblocked events
+    userUnblockedHandler = (data: any) => {
+      console.log('Received user:unblocked event:', data)
+      const { targetUserId } = data
+      if (targetUserId) {
+        const state = get()
+        state.toggleBlockUser(targetUserId)
+      }
+    }
+
     socket.on('message:created', messageCreatedHandler)
     socket.on('message:status', messageStatusHandler)
     socket.on('conversation:created', conversationCreatedHandler)
@@ -888,6 +1229,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
     socket.on('conversation:moderator-updated', conversationModeratorUpdatedHandler)
     socket.on('typing', typingHandler)
     socket.on('nickname:updated', nicknameUpdatedHandler_local)
+    socket.on('user:profile-updated', userProfileUpdatedHandler)
+    socket.on('conversation:muted', conversationMutedHandler)
+    socket.on('conversation:pinned', conversationPinnedHandler)
+    socket.on('conversation:hidden', conversationHiddenHandler)
+    socket.on('conversation:messages-cleared', conversationMessagesClearedHandler)
+    socket.on('user:blocked', userBlockedHandler)
+    socket.on('user:unblocked', userUnblockedHandler)
     wsListenersSetup = true
     currentSocketId = socket.id || null
 

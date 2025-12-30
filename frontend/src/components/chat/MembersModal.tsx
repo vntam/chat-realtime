@@ -568,11 +568,11 @@ export default function MembersModal({ open, onClose, conversation }: MembersMod
   if (!conversation) return null
 
   return (
-    <Dialog open={open} onClose={onClose}>
+    <Dialog open={open} onClose={onClose} draggable={true}>
       <DialogContent className="max-w-md max-h-[85vh] flex flex-col">
         {showAddMember ? (
           <>
-            <DialogHeader onClose={() => setShowAddMember(false)}>
+            <DialogHeader onClose={() => setShowAddMember(false)} draggable={false}>
               <DialogTitle>Thêm thành viên</DialogTitle>
             </DialogHeader>
             <DialogBody className="flex-1 overflow-y-auto space-y-4">
@@ -650,7 +650,7 @@ export default function MembersModal({ open, onClose, conversation }: MembersMod
           </>
         ) : (
           <>
-            <DialogHeader onClose={onClose}>
+            <DialogHeader onClose={onClose} draggable={true}>
               <DialogTitle>{isGroup ? 'Thành viên nhóm' : 'Thông tin cuộc trò chuyện'}</DialogTitle>
             </DialogHeader>
             <DialogBody className="flex-1 overflow-y-auto space-y-4">
@@ -721,12 +721,12 @@ export default function MembersModal({ open, onClose, conversation }: MembersMod
                       />
                       <div className="flex-1 min-w-0">
                         {isEditing ? (
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 relative z-[100000]">
                             <input
                               type="text"
                               value={nicknameInput}
                               onChange={(e) => setNicknameInput(e.target.value)}
-                              className="flex-1 px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              className="flex-1 px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-[#242526]"
                               placeholder="Nhập biệt danh..."
                               maxLength={50}
                               autoFocus

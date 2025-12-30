@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Search, Plus, MoreVertical } from 'lucide-react'
+import { Search, Plus, MoreVertical, Pin, BellOff } from 'lucide-react'
 import { chatService } from '@/services/chatService'
 import type { Conversation } from '@/services/chatService'
 import { userService } from '@/services/userService'
@@ -14,7 +14,7 @@ import Avatar from '@/components/ui/Avatar'
 
 export default function ConversationList() {
   const { user } = useAuthStore()
-  const { conversations, setConversations, selectConversation, selectedConversation, unreadCounts, markConversationAsRead, getNickname, setNicknames } = useChatStore()
+  const { conversations, setConversations, selectConversation, selectedConversation, unreadCounts, markConversationAsRead, getNickname, setNicknames, conversationSettings } = useChatStore()
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -159,19 +159,47 @@ export default function ConversationList() {
     }
   }
 
-  const filteredConversations = conversations.filter((conv) => {
-    const searchLower = searchQuery.toLowerCase()
+  // Filter and sort conversations
+  const filteredConversations = conversations
+    .filter((conv) => {
+      const settings = conversationSettings.get(conv.id) || {}
+      // Filter out hidden conversations
+      if (settings.hidden) {
+        return false
+      }
 
-    // Search by conversation name
-    if (conv.name && conv.name.toLowerCase().includes(searchLower)) {
-      return true
-    }
+      const searchLower = searchQuery.toLowerCase()
 
-    // Search by participant names
-    return conv.participants.some(
-      (p) => p.name?.toLowerCase().includes(searchLower) || p.email?.toLowerCase().includes(searchLower)
-    )
-  })
+      // Search by conversation name
+      if (conv.name && conv.name.toLowerCase().includes(searchLower)) {
+        return true
+      }
+
+      // Search by participant names
+      return conv.participants.some(
+        (p) => p.name?.toLowerCase().includes(searchLower) || p.email?.toLowerCase().includes(searchLower)
+      )
+    })
+    .sort((a, b) => {
+      const aSettings = conversationSettings.get(a.id) || {}
+      const bSettings = conversationSettings.get(b.id) || {}
+
+      // Pinned conversations first
+      if (aSettings.pinned && !bSettings.pinned) return -1
+      if (!aSettings.pinned && bSettings.pinned) return 1
+
+      // If both are pinned, sort by pinned order
+      if (aSettings.pinned && bSettings.pinned) {
+        const aOrder = aSettings.pinnedOrder || 0
+        const bOrder = bSettings.pinnedOrder || 0
+        return aOrder - bOrder
+      }
+
+      // Finally, sort by last message time (most recent first)
+      const aTime = a.lastMessage?.createdAt ? new Date(a.lastMessage.createdAt).getTime() : 0
+      const bTime = b.lastMessage?.createdAt ? new Date(b.lastMessage.createdAt).getTime() : 0
+      return bTime - aTime
+    })
 
   const getConversationName = (conversation: Conversation) => {
     if (conversation.name) return conversation.name
@@ -269,6 +297,7 @@ export default function ConversationList() {
               ? formatTime(conversation.lastMessage.createdAt)
               : ''
             const showMenu = activeMenuId === conversation.id
+            const settings = conversationSettings.get(conversation.id) || {}
 
             return (
               <div key={conversation.id} className="relative">
@@ -310,14 +339,26 @@ export default function ConversationList() {
                   <div className="flex-1 min-w-0">
                     {/* Top line: Group name (spaced) · Time */}
                     <div className="flex items-center justify-between mb-1">
-                      <h3 className={`font-medium text-sm truncate pr-2 ${unreadCount > 0 ? 'font-semibold text-gray-900 dark:text-[#e4e6eb]' : 'text-gray-700 dark:text-[#e4e6eb]'}`}>
-                        {getConversationName(conversation)}
-                      </h3>
-                      {lastMessageTime && (
-                        <span className="text-xs text-gray-400 dark:text-[#b0b3b8] flex-shrink-0">
-                          {lastMessageTime}
-                        </span>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {/* Pinned indicator */}
+                        {settings.pinned && (
+                          <Pin className="w-3 h-3 text-blue-500 fill-blue-500 flex-shrink-0" />
+                        )}
+                        <h3 className={`font-medium text-sm truncate pr-2 ${unreadCount > 0 ? 'font-semibold text-gray-900 dark:text-[#e4e6eb]' : 'text-gray-700 dark:text-[#e4e6eb]'}`}>
+                          {getConversationName(conversation)}
+                        </h3>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {/* Muted indicator */}
+                        {settings.muted && (
+                          <BellOff className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                        )}
+                        {lastMessageTime && (
+                          <span className="text-xs text-gray-400 dark:text-[#b0b3b8] flex-shrink-0">
+                            {lastMessageTime}
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     {/* Bottom line: Username: message (full width) */}
