@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { JwtModule } from '@nestjs/jwt';
 import { HttpModule } from '@nestjs/axios';
+import { ClientProxyFactory, Transport } from '@nestjs/microservices';
 import { ChatService } from './chat.service';
 import { ChatGateway } from './chat.gateway';
 import { ChatController } from './chat.controller';
@@ -12,6 +13,23 @@ import {
 } from './schemas/conversation.schema';
 import { Message, MessageSchema } from './schemas/message.schema';
 import { Nickname, NicknameSchema } from './schemas/nickname.schema';
+
+// RabbitMQ Client provider factory
+const notificationClientFactory = {
+  provide: 'NOTIFICATION_SERVICE',
+  useFactory: () => {
+    return ClientProxyFactory.create({
+      transport: Transport.RMQ,
+      options: {
+        urls: [process.env.RABBITMQ_URL || 'amqp://guest:guest@localhost:5672'],
+        queue: 'notification_queue',
+        queueOptions: {
+          durable: true,
+        },
+      },
+    });
+  },
+};
 
 @Module({
   imports: [
@@ -27,7 +45,12 @@ import { Nickname, NicknameSchema } from './schemas/nickname.schema';
     HttpModule,
   ],
   controllers: [ChatController],
-  providers: [ChatService, SocketService, ChatGateway],
+  providers: [
+    ChatService,
+    SocketService,
+    ChatGateway,
+    notificationClientFactory, // RabbitMQ Client for notifications
+  ],
   exports: [ChatService, SocketService],
 })
 export class ChatModule {}
