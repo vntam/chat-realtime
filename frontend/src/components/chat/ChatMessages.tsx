@@ -181,33 +181,6 @@ export default function ChatMessages() {
     fetchSenderInfos()
   }, [messages])
 
-  // Listen for user:updated events from WebSocket (realtime profile updates)
-  useEffect(() => {
-    const socket = getSocket()
-    if (!socket) return
-
-    const handleUserUpdated = (data: { user_id: number; username: string; avatar_url?: string }) => {
-      console.log('[ChatMessages] User updated event received:', data)
-
-      // Update senderInfos with new user info
-      setSenderInfos((prev) => {
-        const newMap = new Map(prev)
-        newMap.set(data.user_id, {
-          username: data.username,
-          avatar_url: data.avatar_url,
-        })
-        console.log('[ChatMessages] Updated sender info for user', data.user_id)
-        return newMap
-      })
-    }
-
-    socket.on('user:updated', handleUserUpdated)
-
-    return () => {
-      socket.off('user:updated', handleUserUpdated)
-    }
-  }, [])
-
   const formatTime = (dateString: string) => {
     const date = new Date(dateString)
     return date.toLocaleTimeString('vi-VN', {

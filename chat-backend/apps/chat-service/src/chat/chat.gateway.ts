@@ -1128,18 +1128,4 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
       this.logger.error(`[Notification] Error stack: ${error.stack}`);
     }
   }
-
-  /**
-   * Broadcast user profile update to all connected WebSocket clients
-   * Called when a user updates their profile (username, avatar, etc.)
-   */
-  broadcastUserUpdate(data: { userId: number; username: string; avatarUrl?: string }) {
-    this.logger.log(`[UserUpdate] Broadcasting user update for user ${data.userId}`);
-    // Broadcast to all connected clients
-    this.server.emit('user:updated', {
-      user_id: data.userId,
-      username: data.username,
-      avatar_url: data.avatarUrl,
-    });
-  }
 }

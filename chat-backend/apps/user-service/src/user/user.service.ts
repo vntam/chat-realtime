@@ -3,11 +3,9 @@ import {
   NotFoundException,
   ForbiddenException,
   ConflictException,
-  Inject,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { ClientProxy } from '@nestjs/microservices';
 import {
   CreateUserDto,
   UpdateUserDto,
@@ -28,7 +26,6 @@ export class UsersService {
   constructor(
     @InjectRepository(User) private repo: Repository<User>,
     @InjectRepository(UserRole) private userRoleRepo: Repository<UserRole>,
-    @Inject('USER_EVENT_CLIENT') private userEventClient: ClientProxy,
   ) {
     // Load pagination settings from environment variables
     this.defaultPageSize = parseInt(process.env.DEFAULT_PAGE_SIZE || '50', 10);
@@ -198,20 +195,7 @@ export class UsersService {
     });
 
     const saved = await this.repo.save(user);
-    const response = this.toResponse(saved);
-
-    // Emit RabbitMQ event for realtime update to other services
-    this.userEventClient.emit('user.profile.updated', {
-      user_id: saved.user_id,
-      username: saved.username,
-      email: saved.email,
-      avatar_url: saved.avatar_url,
-    }).subscribe({
-      next: () => console.log('[UserService] User update event emitted successfully'),
-      error: (err) => console.error('[UserService] Failed to emit user update event:', err),
-    });
-
-    return response;
+    return this.toResponse(saved);
   }
 
   // ==================================================
