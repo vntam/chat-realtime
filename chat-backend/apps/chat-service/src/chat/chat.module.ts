@@ -7,6 +7,7 @@ import { ChatService } from './chat.service';
 import { ChatGateway } from './chat.gateway';
 import { ChatController } from './chat.controller';
 import { SocketService } from './socket.service';
+import { UserRabbitMQController } from '../user/user-rabbitmq.controller';
 import {
   Conversation,
   ConversationSchema,
@@ -44,7 +45,7 @@ const notificationClientFactory = {
     }),
     HttpModule,
   ],
-  controllers: [ChatController],
+  controllers: [ChatController, UserRabbitMQController],
   providers: [
     ChatService,
     SocketService,
