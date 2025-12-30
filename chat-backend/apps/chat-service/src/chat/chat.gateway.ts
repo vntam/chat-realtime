@@ -1164,4 +1164,197 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
       this.logger.error(`[Notification] Error stack: ${error.stack}`);
     }
   }
+
+  // ============ CONVERSATION SETTINGS (Mute, Pin, Hide, etc.) ============
+
+  /**
+   * Handle mute/unmute conversation request via WebSocket
+   * Message: { conversationId: string; muted: boolean; muteUntil?: Date }
+   */
+  @SubscribeMessage('conversation:mute')
+  async handleMuteConversation(
+    @ConnectedSocket() client: AuthSocket,
+    @MessageBody() payload: { conversationId: string; muted: boolean; muteUntil?: Date | string },
+  ): Promise<WsAck> {
+    try {
+      if (!client.userId) {
+        throw new UnauthorizedException('Not authenticated');
+      }
+
+      const result = await this.chatService.setConversationMute(
+        client.userId,
+        payload.conversationId,
+        payload.muted,
+        payload.muteUntil ? new Date(payload.muteUntil) : undefined,
+      );
+
+      // Broadcast to user's personal room
+      this.server.to(`user:${client.userId}`).emit('conversation:muted', {
+        conversationId: payload.conversationId,
+        muted: payload.muted,
+        muteUntil: payload.muteUntil,
+      });
+
+      return this.ack(true, result);
+    } catch (error) {
+      return this.ack(false, null, {
+        code: 'BAD_REQUEST',
+        message: error.message,
+      });
+    }
+  }
+
+  /**
+   * Handle pin/unpin conversation request via WebSocket
+   * Message: { conversationId: string; pinned: boolean }
+   */
+  @SubscribeMessage('conversation:pin')
+  async handlePinConversation(
+    @ConnectedSocket() client: AuthSocket,
+    @MessageBody() payload: { conversationId: string; pinned: boolean },
+  ): Promise<WsAck> {
+    try {
+      if (!client.userId) {
+        throw new UnauthorizedException('Not authenticated');
+      }
+
+      const result = await this.chatService.setConversationPin(
+        client.userId,
+        payload.conversationId,
+        payload.pinned,
+      );
+
+      // Broadcast to user's personal room
+      this.server.to(`user:${client.userId}`).emit('conversation:pinned', {
+        conversationId: payload.conversationId,
+        pinned: payload.pinned,
+      });
+
+      return this.ack(true, result);
+    } catch (error) {
+      return this.ack(false, null, {
+        code: 'BAD_REQUEST',
+        message: error.message,
+      });
+    }
+  }
+
+  /**
+   * Handle hide/unhide conversation request via WebSocket
+   * Message: { conversationId: string; hidden: boolean }
+   */
+  @SubscribeMessage('conversation:hide')
+  async handleHideConversation(
+    @ConnectedSocket() client: AuthSocket,
+    @MessageBody() payload: { conversationId: string; hidden: boolean },
+  ): Promise<WsAck> {
+    try {
+      if (!client.userId) {
+        throw new UnauthorizedException('Not authenticated');
+      }
+
+      const result = await this.chatService.setConversationHidden(
+        client.userId,
+        payload.conversationId,
+        payload.hidden,
+      );
+
+      // Broadcast to user's personal room
+      this.server.to(`user:${client.userId}`).emit('conversation:hidden', {
+        conversationId: payload.conversationId,
+        hidden: payload.hidden,
+      });
+
+      return this.ack(true, result);
+    } catch (error) {
+      return this.ack(false, null, {
+        code: 'BAD_REQUEST',
+        message: error.message,
+      });
+    }
+  }
+
+  /**
+   * Handle block user request via WebSocket
+   * Message: { targetUserId: number }
+   */
+  @SubscribeMessage('user:block')
+  async handleBlockUser(
+    @ConnectedSocket() client: AuthSocket,
+    @MessageBody() payload: { targetUserId: number },
+  ): Promise<WsAck> {
+    try {
+      if (!client.userId) {
+        throw new UnauthorizedException('Not authenticated');
+      }
+
+      // Call User Service to block user
+      const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:3001';
+      await this.httpService.axiosRef.post(
+        `${userServiceUrl}/users/block/${payload.targetUserId}`,
+        {},
+        {
+          headers: {
+            Authorization: client.handshake.headers.authorization,
+          },
+        },
+      );
+
+      // Emit to both users (blocker and blocked)
+      this.server.to(`user:${client.userId}`).emit('user:blocked', {
+        targetUserId: payload.targetUserId,
+      });
+
+      // Also notify the blocked user
+      this.server.to(`user:${payload.targetUserId}`).emit('user:blocked-by', {
+        blockerId: client.userId,
+      });
+
+      return this.ack(true, { targetUserId: payload.targetUserId });
+    } catch (error) {
+      return this.ack(false, null, {
+        code: 'BAD_REQUEST',
+        message: error.message,
+      });
+    }
+  }
+
+  /**
+   * Handle unblock user request via WebSocket
+   * Message: { targetUserId: number }
+   */
+  @SubscribeMessage('user:unblock')
+  async handleUnblockUser(
+    @ConnectedSocket() client: AuthSocket,
+    @MessageBody() payload: { targetUserId: number },
+  ): Promise<WsAck> {
+    try {
+      if (!client.userId) {
+        throw new UnauthorizedException('Not authenticated');
+      }
+
+      // Call User Service to unblock user
+      const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:3001';
+      await this.httpService.axiosRef.delete(
+        `${userServiceUrl}/users/block/${payload.targetUserId}`,
+        {
+          headers: {
+            Authorization: client.handshake.headers.authorization,
+          },
+        },
+      );
+
+      // Emit to the blocker
+      this.server.to(`user:${client.userId}`).emit('user:unblocked', {
+        targetUserId: payload.targetUserId,
+      });
+
+      return this.ack(true, { targetUserId: payload.targetUserId });
+    } catch (error) {
+      return this.ack(false, null, {
+        code: 'BAD_REQUEST',
+        message: error.message,
+      });
+    }
+  }
 }

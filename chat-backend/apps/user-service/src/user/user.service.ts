@@ -267,6 +267,120 @@ export class UsersService {
   }
 
   // ==================================================
+  // BLOCK USER
+  // ==================================================
+  /**
+   * Block a user - adds targetUserId to current user's blocked_users list
+   * Also emits WebSocket events (handled by Chat Gateway)
+   */
+  async blockUser(currentUserId: number, targetUserId: number): Promise<UserResponseDto> {
+    if (currentUserId === targetUserId) {
+      throw new ForbiddenException('Bạn không thể chặn chính mình');
+    }
+
+    const user = await this.repo.findOne({ where: { user_id: currentUserId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Check if already blocked
+    if (user.blocked_users && user.blocked_users.includes(targetUserId)) {
+      return this.toResponse(user);
+    }
+
+    // Add to blocked_users array
+    user.blocked_users = [...(user.blocked_users || []), targetUserId];
+    const saved = await this.repo.save(user);
+
+    return this.toResponse(saved);
+  }
+
+  /**
+   * Unblock a user - removes targetUserId from current user's blocked_users list
+   */
+  async unblockUser(currentUserId: number, targetUserId: number): Promise<UserResponseDto> {
+    const user = await this.repo.findOne({ where: { user_id: currentUserId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Remove from blocked_users array
+    user.blocked_users = (user.blocked_users || []).filter((id) => id !== targetUserId);
+    const saved = await this.repo.save(user);
+
+    return this.toResponse(saved);
+  }
+
+  /**
+   * Get list of blocked users with their details
+   */
+  async getBlockedUsers(userId: number): Promise<PublicUserResponseDto[]> {
+    const user = await this.repo.findOne({ where: { user_id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const blockedIds = user.blocked_users || [];
+    if (blockedIds.length === 0) {
+      return [];
+    }
+
+    // Fetch user details for all blocked IDs
+    const blockedUsers = await this.repo
+      .createQueryBuilder('user')
+      .where('user.user_id IN (:...ids)', { ids: blockedIds })
+      .getMany();
+
+    return blockedUsers.map((u) => this.toPublicResponse(u));
+  }
+
+  // ==================================================
+  // CONVERSATION SETTINGS
+  // ==================================================
+  /**
+   * Get user's conversation settings for all conversations
+   */
+  async getConversationSettings(userId: number): Promise<Record<string, any>> {
+    const user = await this.repo.findOne({ where: { user_id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    return user.conversation_settings || {};
+  }
+
+  /**
+   * Update user's settings for a specific conversation
+   * Merges the new settings with existing settings for that conversation
+   */
+  async updateConversationSettings(
+    userId: number,
+    conversationId: string,
+    settings: any,
+  ): Promise<Record<string, any>> {
+    const user = await this.repo.findOne({ where: { user_id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Initialize conversation_settings if not exists
+    if (!user.conversation_settings) {
+      user.conversation_settings = {};
+    }
+
+    // Merge new settings with existing settings for this conversation
+    const currentSettings = user.conversation_settings[conversationId] || {};
+    user.conversation_settings[conversationId] = {
+      ...currentSettings,
+      ...settings,
+    };
+
+    await this.repo.save(user);
+
+    return user.conversation_settings;
+  }
+
+  // ==================================================
   // MAPPER — ENTITY → DTO
   // ==================================================
   /**

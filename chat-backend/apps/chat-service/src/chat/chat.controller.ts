@@ -308,4 +308,167 @@ export class ChatController {
       );
     }
   }
+
+  // ==================================================
+  // CONVERSATION SETTINGS (Mute, Pin, Hide, etc.)
+  // ==================================================
+
+  /**
+   * Mute/Unmute conversation notifications
+   * POST /conversations/:conversationId/mute
+   * Body: { muted: boolean, muteUntil?: Date }
+   */
+  @Post(':id/mute')
+  @UseGuards(JwtAuthGuard)
+  async muteConversation(
+    @Param('id') conversationId: string,
+    @Body() body: { muted: boolean; muteUntil?: Date | string },
+    @Request() req,
+  ) {
+    try {
+      const userId = req.user?.sub || req.user?.userId;
+      if (!userId) {
+        throw new HttpException('User ID not found', HttpStatus.UNAUTHORIZED);
+      }
+      const result = await this.chatService.setConversationMute(
+        userId,
+        conversationId,
+        body.muted,
+        body.muteUntil ? new Date(body.muteUntil) : undefined,
+      );
+
+      // Emit WebSocket event to user's personal room
+      const server = this.socketService.getServer();
+      if (server) {
+        server.to(`user:${userId}`).emit('conversation:muted', {
+          conversationId,
+          muted: body.muted,
+          muteUntil: body.muteUntil,
+        });
+      }
+
+      return result;
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Failed to update mute settings',
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * Pin/Unpin conversation
+   * POST /conversations/:conversationId/pin
+   * Body: { pinned: boolean, order?: number }
+   */
+  @Post(':id/pin')
+  @UseGuards(JwtAuthGuard)
+  async pinConversation(
+    @Param('id') conversationId: string,
+    @Body() body: { pinned: boolean; order?: number },
+    @Request() req,
+  ) {
+    try {
+      const userId = req.user?.sub || req.user?.userId;
+      if (!userId) {
+        throw new HttpException('User ID not found', HttpStatus.UNAUTHORIZED);
+      }
+      const result = await this.chatService.setConversationPin(
+        userId,
+        conversationId,
+        body.pinned,
+        body.order,
+      );
+
+      // Emit WebSocket event to user's personal room
+      const server = this.socketService.getServer();
+      if (server) {
+        server.to(`user:${userId}`).emit('conversation:pinned', {
+          conversationId,
+          pinned: body.pinned,
+          order: body.order,
+        });
+      }
+
+      return result;
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Failed to update pin settings',
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * Hide/Unhide conversation
+   * POST /conversations/:conversationId/hide
+   * Body: { hidden: boolean }
+   */
+  @Post(':id/hide')
+  @UseGuards(JwtAuthGuard)
+  async hideConversation(
+    @Param('id') conversationId: string,
+    @Body() body: { hidden: boolean },
+    @Request() req,
+  ) {
+    try {
+      const userId = req.user?.sub || req.user?.userId;
+      if (!userId) {
+        throw new HttpException('User ID not found', HttpStatus.UNAUTHORIZED);
+      }
+      const result = await this.chatService.setConversationHidden(
+        userId,
+        conversationId,
+        body.hidden,
+      );
+
+      // Emit WebSocket event to user's personal room
+      const server = this.socketService.getServer();
+      if (server) {
+        server.to(`user:${userId}`).emit('conversation:hidden', {
+          conversationId,
+          hidden: body.hidden,
+        });
+      }
+
+      return result;
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Failed to update hide settings',
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * Clear chat history (delete all messages for current user only)
+   * DELETE /conversations/:conversationId/messages
+   * This soft-deletes messages by adding userId to deleted_by array
+   */
+  @Delete(':id/messages')
+  @UseGuards(JwtAuthGuard)
+  async clearChatHistory(@Param('id') conversationId: string, @Request() req) {
+    try {
+      const userId = req.user?.sub || req.user?.userId;
+      if (!userId) {
+        throw new HttpException('User ID not found', HttpStatus.UNAUTHORIZED);
+      }
+      await this.chatService.clearChatHistory(conversationId, userId);
+
+      // Emit WebSocket event ONLY to the user who cleared
+      const server = this.socketService.getServer();
+      if (server) {
+        server.to(`user:${userId}`).emit('conversation:messages-cleared', {
+          conversationId,
+        });
+      }
+
+      return { message: 'Chat history cleared successfully' };
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Failed to clear chat history',
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
 }

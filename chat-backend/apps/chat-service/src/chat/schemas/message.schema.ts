@@ -61,6 +61,9 @@ export class Message {
   @Prop({ type: [Number], default: [] })
   seen_by: number[];
 
+  @Prop({ type: [Number], default: [] })
+  deleted_by: number[]; // Array of user IDs who deleted this message (soft delete per user)
+
   @Prop({
     type: String,
     enum: Object.values(MessageStatus),

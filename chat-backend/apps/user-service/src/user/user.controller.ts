@@ -184,4 +184,75 @@ export class UsersController {
   ) {
     return this.usersService.removeRole(id, roleId);
   }
+
+  // ============================================
+  // BLOCK USER
+  // ============================================
+
+  /**
+   * Block a user (prevent them from sending messages)
+   */
+  @UseGuards(JwtGuard)
+  @Post('block/:userId')
+  @HttpCode(HttpStatus.OK)
+  async blockUser(
+    @Param('userId', ParseIntPipe) targetUserId: number,
+    @GetCurrentUser('sub') currentUserId: number,
+  ) {
+    this.logger.log(`[UsersController] User ${currentUserId} blocking user ${targetUserId}`);
+    return this.usersService.blockUser(currentUserId, targetUserId);
+  }
+
+  /**
+   * Unblock a user
+   */
+  @UseGuards(JwtGuard)
+  @Delete('block/:userId')
+  @HttpCode(HttpStatus.OK)
+  async unblockUser(
+    @Param('userId', ParseIntPipe) targetUserId: number,
+    @GetCurrentUser('sub') currentUserId: number,
+  ) {
+    this.logger.log(`[UsersController] User ${currentUserId} unblocking user ${targetUserId}`);
+    return this.usersService.unblockUser(currentUserId, targetUserId);
+  }
+
+  /**
+   * Get list of blocked users
+   */
+  @UseGuards(JwtGuard)
+  @Get('blocked')
+  async getBlockedUsers(@GetCurrentUser('sub') userId: number) {
+    this.logger.log(`[UsersController] Getting blocked users for user ${userId}`);
+    return this.usersService.getBlockedUsers(userId);
+  }
+
+  // ============================================
+  // CONVERSATION SETTINGS (per-user settings)
+  // ============================================
+
+  /**
+   * Get user's conversation settings
+   */
+  @UseGuards(JwtGuard)
+  @Get(':userId/conversation-settings')
+  async getConversationSettings(
+    @Param('userId', ParseIntPipe) userId: number,
+  ) {
+    return this.usersService.getConversationSettings(userId);
+  }
+
+  /**
+   * Update user's conversation settings
+   */
+  @UseGuards(JwtGuard)
+  @Patch(':userId/conversation-settings')
+  @HttpCode(HttpStatus.OK)
+  async updateConversationSettings(
+    @Param('userId', ParseIntPipe) userId: number,
+    @Body() body: { conversationId: string; settings: any },
+  ) {
+    this.logger.log(`[UsersController] Updating conversation settings for user ${userId}, conversation ${body.conversationId}`);
+    return this.usersService.updateConversationSettings(userId, body.conversationId, body.settings);
+  }
 }

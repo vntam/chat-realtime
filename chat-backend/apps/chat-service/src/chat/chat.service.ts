@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   BadRequestException,
   Logger,
+  HttpService,
 } from '@nestjs/common';
 import { MessageType } from './schemas/message.schema';
 import { InjectModel } from '@nestjs/mongoose';
@@ -42,6 +43,7 @@ export class ChatService {
     private messageModel: Model<MessageDocument>,
     @InjectModel(Nickname.name)
     private nicknameModel: Model<NicknameDocument>,
+    private readonly httpService: HttpService,
   ) {
     // Load pagination settings from environment variables
     this.defaultPageSize = parseInt(process.env.DEFAULT_PAGE_SIZE || '50', 10);
@@ -128,37 +130,6 @@ export class ChatService {
       throw new NotFoundException('Conversation not found');
     }
     return conversation;
-  }
-
-  async deleteConversation(
-    conversationId: string,
-    userId: number,
-  ): Promise<void> {
-    const conversation = await this.findConversationById(conversationId);
-
-    // For group chats, only admin can delete
-    if (conversation.type === 'group') {
-      if (conversation.admin_id !== userId) {
-        throw new ForbiddenException(
-          'Only admin can delete group conversation',
-        );
-      }
-    } else {
-      // For private chats, any participant can delete
-      if (!conversation.participants.includes(userId)) {
-        throw new ForbiddenException(
-          'You are not a participant in this conversation',
-        );
-      }
-    }
-
-    // Delete all messages in this conversation
-    await this.messageModel
-      .deleteMany({ conversation_id: conversationId })
-      .exec();
-
-    // Delete the conversation
-    await this.conversationModel.findByIdAndDelete(conversationId).exec();
   }
 
   async getConversationMembers(
@@ -391,10 +362,13 @@ export class ChatService {
     interface MessageQuery {
       conversation_id: Types.ObjectId;
       created_at?: { $lt: Date };
+      deleted_by?: { $ne: number };
     }
 
     const query: MessageQuery = {
       conversation_id: new Types.ObjectId(conversationId),
+      // IMPORTANT: Filter out messages deleted by this user (soft delete per user)
+      deleted_by: { $ne: userId },
     };
     if (before) {
       query.created_at = { $lt: before };
@@ -1141,6 +1115,231 @@ export class ChatService {
     return (
       conversation.admin_id === userId ||
       (conversation.moderator_ids || []).includes(userId)
+    );
+  }
+
+  // ============ CONVERSATION SETTINGS ============
+
+  /**
+   * Helper: Get User Service URL from environment
+   */
+  private getUserServiceUrl(): string {
+    return process.env.USER_SERVICE_URL || 'http://localhost:3001';
+  }
+
+  /**
+   * Helper: Get user's conversation settings from User Service
+   */
+  private async getUserConversationSettings(
+    userId: number,
+  ): Promise<Record<string, any>> {
+    const url = `${this.getUserServiceUrl()}/users/${userId}/conversation-settings`;
+    const response = await this.httpService.axiosRef.get(url);
+    return response.data || {};
+  }
+
+  /**
+   * Helper: Update user's conversation settings via User Service
+   */
+  private async updateUserConversationSettings(
+    userId: number,
+    conversationId: string,
+    settings: any,
+  ): Promise<void> {
+    const url = `${this.getUserServiceUrl()}/users/${userId}/conversation-settings`;
+    await this.httpService.axiosRef.patch(url, {
+      conversationId,
+      settings,
+    });
+  }
+
+  /**
+   * Mute/Unmute conversation notifications
+   * Updates user's conversation_settings in User Service
+   */
+  async setConversationMute(
+    userId: number,
+    conversationId: string,
+    muted: boolean,
+    muteUntil?: Date,
+  ): Promise<any> {
+    this.logger.log(
+      `[ChatService] User ${userId} setting mute=${muted} for conversation ${conversationId}`,
+    );
+
+    // Verify user is participant
+    const conversation = await this.findConversationById(conversationId);
+    if (!conversation.participants.includes(userId)) {
+      throw new ForbiddenException(
+        'You are not a participant in this conversation',
+      );
+    }
+
+    // Update settings in User Service
+    await this.updateUserConversationSettings(userId, conversationId, {
+      muted,
+      muted_until: muteUntil,
+    });
+
+    return { conversationId, muted, muteUntil };
+  }
+
+  /**
+   * Pin/Unpin conversation
+   * Updates user's conversation_settings in User Service
+   */
+  async setConversationPin(
+    userId: number,
+    conversationId: string,
+    pinned: boolean,
+    order?: number,
+  ): Promise<any> {
+    this.logger.log(
+      `[ChatService] User ${userId} setting pin=${pinned} for conversation ${conversationId}`,
+    );
+
+    // Verify user is participant
+    const conversation = await this.findConversationById(conversationId);
+    if (!conversation.participants.includes(userId)) {
+      throw new ForbiddenException(
+        'You are not a participant in this conversation',
+      );
+    }
+
+    // Get current settings to determine next pin order if not provided
+    const currentSettings = await this.getUserConversationSettings(userId);
+    const currentOrder = currentSettings[conversationId]?.pinned_order || 0;
+
+    // Update settings in User Service
+    await this.updateUserConversationSettings(userId, conversationId, {
+      pinned,
+      pinned_order: pinned ? (order || currentOrder + 1) : null,
+    });
+
+    return {
+      conversationId,
+      pinned,
+      order: pinned ? (order || currentOrder + 1) : null,
+    };
+  }
+
+  /**
+   * Hide/Unhide conversation
+   * Updates user's conversation_settings in User Service
+   */
+  async setConversationHidden(
+    userId: number,
+    conversationId: string,
+    hidden: boolean,
+  ): Promise<any> {
+    this.logger.log(
+      `[ChatService] User ${userId} setting hidden=${hidden} for conversation ${conversationId}`,
+    );
+
+    // Verify user is participant
+    const conversation = await this.findConversationById(conversationId);
+    if (!conversation.participants.includes(userId)) {
+      throw new ForbiddenException(
+        'You are not a participant in this conversation',
+      );
+    }
+
+    // Update settings in User Service
+    await this.updateUserConversationSettings(userId, conversationId, {
+      hidden,
+      hidden_at: hidden ? new Date() : null,
+    });
+
+    return { conversationId, hidden };
+  }
+
+  /**
+   * Clear chat history for current user only
+   * Soft deletes messages by adding userId to deleted_by array
+   */
+  async clearChatHistory(
+    conversationId: string,
+    userId: number,
+  ): Promise<void> {
+    this.logger.log(
+      `[ChatService] User ${userId} clearing chat history for conversation ${conversationId}`,
+    );
+
+    // Verify user is participant
+    const conversation = await this.findConversationById(conversationId);
+    if (!conversation.participants.includes(userId)) {
+      throw new ForbiddenException(
+        'You are not a participant in this conversation',
+      );
+    }
+
+    // Soft delete: Mark all messages as deleted by this user
+    // Messages are NOT actually deleted from DB, just marked as deleted_by for this user
+    await this.messageModel
+      .updateMany(
+        {
+          conversation_id: new Types.ObjectId(conversationId),
+        },
+        {
+          $addToSet: { deleted_by: userId },
+        },
+      )
+      .exec();
+
+    // Update last_message_cleared timestamp in User Service
+    await this.updateUserConversationSettings(userId, conversationId, {
+      last_message_cleared: new Date(),
+    });
+
+    this.logger.log(
+      `[ChatService] Chat history cleared for user ${userId} in conversation ${conversationId}`,
+    );
+  }
+
+  /**
+   * Delete conversation (override with new behavior)
+   * - Private chats: Only hide for deleter (sets hidden flag)
+   * - Group chats: Only admin can delete (permanent delete for everyone)
+   */
+  async deleteConversation(
+    conversationId: string,
+    userId: number,
+  ): Promise<void> {
+    const conversation = await this.findConversationById(conversationId);
+
+    // For private chats: only hide for current user (soft delete per user)
+    if (conversation.type === 'private') {
+      if (!conversation.participants.includes(userId)) {
+        throw new ForbiddenException(
+          'You are not a participant in this conversation',
+        );
+      }
+
+      // Just hide the conversation for this user
+      await this.setConversationHidden(userId, conversationId, true);
+      this.logger.log(
+        `[ChatService] Private conversation ${conversationId} hidden for user ${userId}`,
+      );
+      return;
+    }
+
+    // For group chats: only admin can delete (hard delete for everyone)
+    if (conversation.admin_id !== userId) {
+      throw new ForbiddenException(
+        'Only admin can delete group conversations',
+      );
+    }
+
+    // Delete all messages in this conversation
+    await this.messageModel
+      .deleteMany({ conversation_id: conversationId })
+      .exec();
+
+    // Delete the conversation
+    await this.conversationModel.findByIdAndDelete(conversationId).exec();
+
+    this.logger.log(
+      `[ChatService] Group conversation ${conversationId} deleted by admin ${userId}`,
     );
   }
 }
