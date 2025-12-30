@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Camera, User, Lock, Save, X, Bell, Check, Eye, EyeOff } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { userService } from '@/services/userService'
+import { getSocket } from '@/lib/socket'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import { Card } from '@/components/ui/Card'
@@ -212,6 +213,17 @@ export default function SettingsPage() {
 
       // Refresh user data from backend to get latest values
       await refreshUser()
+
+      // Emit WebSocket event to notify other users about profile update
+      const socket = getSocket()
+      if (socket && socket.connected) {
+        socket.emit('user:profile-updated', {
+          userId: user!.user_id,
+          username: formData.username.trim(),
+          avatar_url: avatarUrl,
+        })
+        console.log('[SettingsPage] Emitted user:profile-updated event')
+      }
 
       setSuccessMessage('Cập nhật thông tin thành công!')
       setTimeout(() => setSuccessMessage(''), 3000)

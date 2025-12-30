@@ -11,12 +11,20 @@ import MembersModal from '@/components/chat/MembersModal'
 import Button from '@/components/ui/Button'
 import Avatar from '@/components/ui/Avatar'
 
+interface ParticipantInfo {
+  user_id: number
+  username: string
+  avatar_url?: string
+}
+
 export default function ChatBox() {
   const { user } = useAuthStore()
-  const { selectedConversation, setMessages, setupWebSocketListeners, markConversationAsRead, setNicknames, loadMessagesFromStorage } = useChatStore()
+  const { selectedConversation, setMessages, setupWebSocketListeners, markConversationAsRead, setNicknames, loadMessagesFromStorage, getNickname } = useChatStore()
   const [showMembersModal, setShowMembersModal] = useState(false)
   const [showOptionsMenu, setShowOptionsMenu] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+  // Store realtime participant info (fetched from API)
+  const [participantInfos, setParticipantInfos] = useState<Map<number, ParticipantInfo>>(new Map())
 
   // Initialize socket connection ONCE
   useEffect(() => {
@@ -215,17 +223,122 @@ export default function ChatBox() {
     }
   }, [selectedConversation?.id, markConversationAsRead, setNicknames, setMessages])
 
+  // Fetch participant info realtime (avatar + username) for ChatHeader
+  useEffect(() => {
+    const fetchParticipantInfos = async () => {
+      if (!selectedConversation?.participants || selectedConversation.participants.length === 0) {
+        setParticipantInfos(new Map())
+        return
+      }
+
+      // Get all participant IDs
+      const participantIds = selectedConversation.participants
+        .map((p) => parseInt(String(p.id || p.user_id || '0'), 10))
+        .filter((id) => !isNaN(id) && id > 0)
+
+      if (participantIds.length === 0) {
+        setParticipantInfos(new Map())
+        return
+      }
+
+      try {
+        const users = await userService.getUsersByIds(participantIds)
+        const infoMap = new Map<number, ParticipantInfo>()
+
+        users.forEach((u) => {
+          infoMap.set(u.user_id, {
+            user_id: u.user_id,
+            username: u.username,
+            avatar_url: u.avatar_url,
+          })
+        })
+
+        setParticipantInfos(infoMap)
+        console.log('[ChatBox] Updated participant infos:', infoMap)
+      } catch (error) {
+        console.error('[ChatBox] Failed to fetch participant infos:', error)
+      }
+    }
+
+    fetchParticipantInfos()
+  }, [selectedConversation?.id, selectedConversation?.participants])
+
+  // Listen to user:profile-updated event to refresh participant infos in ChatHeader
+  // Setup ONCE and persist across conversation changes
+  useEffect(() => {
+    const socket = getSocket()
+    if (!socket) return
+
+    const handleUserProfileUpdated = (data: any) => {
+      console.log('[ChatBox] Received user:profile-updated event:', data)
+
+      // Re-fetch participant infos to get the latest avatar/username
+      const refreshParticipantInfos = async () => {
+        // Get current conversation from store (always fresh)
+        const currentConv = useChatStore.getState().selectedConversation
+        if (!currentConv?.participants || currentConv.participants.length === 0) {
+          console.log('[ChatBox] No participants to refresh')
+          return
+        }
+
+        const participantIds = currentConv.participants
+          .map((p) => parseInt(String(p.id || p.user_id || '0'), 10))
+          .filter((id) => !isNaN(id) && id > 0)
+
+        if (participantIds.length === 0) return
+
+        try {
+          const users = await userService.getUsersByIds(participantIds)
+          const infoMap = new Map<number, ParticipantInfo>()
+
+          users.forEach((u) => {
+            infoMap.set(u.user_id, {
+              user_id: u.user_id,
+              username: u.username,
+              avatar_url: u.avatar_url,
+            })
+          })
+
+          setParticipantInfos(infoMap)
+          console.log('[ChatBox] Refreshed participant infos after profile update:', infoMap)
+        } catch (error) {
+          console.error('[ChatBox] Failed to refresh participant infos:', error)
+        }
+      }
+
+      refreshParticipantInfos()
+    }
+
+    socket.on('user:profile-updated', handleUserProfileUpdated)
+
+    return () => {
+      socket.off('user:profile-updated', handleUserProfileUpdated)
+    }
+  }, []) // Empty dependency - setup ONCE and persist
+
   const getConversationName = () => {
     if (!selectedConversation) return ''
 
-    if (selectedConversation.name) {
+    // For group chats, use conversation name
+    if (selectedConversation.isGroup && selectedConversation.name) {
       return selectedConversation.name
     }
 
-    // For non-group conversations, show other participant's name
+    // For non-group conversations, check for nickname first
     const currentUserId = String(user?.user_id)
     const otherParticipant = selectedConversation.participants.find((p) => p.id !== currentUserId)
-    return otherParticipant?.name || 'Unknown'
+
+    if (!otherParticipant) return 'Unknown'
+
+    // Check if there's a nickname for this user in this conversation
+    const otherUserId = parseInt(String(otherParticipant.id || otherParticipant.user_id || '0'), 10)
+    const nickname = getNickname(selectedConversation.id, otherUserId)
+
+    // Get realtime participant info from API (fetched)
+    const participantInfo = participantInfos.get(otherUserId)
+
+    // Return nickname FIRST (highest priority), then realtime username, then cached username
+    return nickname || participantInfo?.username || otherParticipant?.name || 'Unknown'
   }
 
   const getConversationAvatar = () => {
@@ -238,7 +351,16 @@ export default function ChatBox() {
     // For private chats, use the other participant's avatar
     const currentUserId = String(user?.user_id)
     const otherParticipant = selectedConversation.participants.find((p) => p.id !== currentUserId)
-    return otherParticipant?.avatar_url
+
+    if (!otherParticipant) return undefined
+
+    const otherUserId = parseInt(String(otherParticipant.id || otherParticipant.user_id || '0'), 10)
+
+    // Get realtime participant info from API (fetched)
+    const participantInfo = participantInfos.get(otherUserId)
+
+    // Return realtime avatar FIRST, then fallback to cached avatar
+    return participantInfo?.avatar_url || otherParticipant?.avatar_url
   }
 
   if (!selectedConversation) {

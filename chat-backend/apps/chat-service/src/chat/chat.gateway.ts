@@ -930,6 +930,36 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
     }
   }
 
+  // ============ USER PROFILE UPDATE ============
+
+  @SubscribeMessage('user:profile-updated')
+  async handleUserProfileUpdated(
+    @ConnectedSocket() client: AuthSocket,
+    @MessageBody() payload: { userId: number; username: string; avatar_url?: string },
+  ): Promise<WsAck> {
+    try {
+      this.logger.log(`User ${client.userId} profile updated: ${payload.username}`);
+
+      // Broadcast to ALL connected users so their ChatHeader/ChatMessages update in realtime
+      // We broadcast to all users because anyone might have a conversation with this user
+      this.server.emit('user:profile-updated', {
+        userId: payload.userId,
+        username: payload.username,
+        avatar_url: payload.avatar_url,
+      });
+
+      this.logger.log(`Broadcasted user:profile-updated for user ${payload.userId} to all connected users`);
+
+      return this.ack(true);
+    } catch (error) {
+      this.logger.error(`User profile update error: ${error.message}`);
+      return this.ack(false, null, {
+        code: 'BAD_REQUEST',
+        message: error.message,
+      });
+    }
+  }
+
   // ============ TYPING INDICATOR ============
 
   @SubscribeMessage('typing')
