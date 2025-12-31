@@ -27,12 +27,14 @@ export default function ConversationMenu({
   onClose,
   onOpenMembers,
 }: ConversationMenuProps) {
-  const { unreadCounts, markConversationAsRead, conversationSettings, setConversationSettings, blockedUsers } = useChatStore()
+  const { unreadCounts, markConversationAsRead, conversationSettings, setConversationSettings, blockedUsers, toggleBlockUser } = useChatStore()
   const { user: currentUser } = useAuthStore()
   const { addToast } = useToastStore()
 
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [showClearDialog, setShowClearDialog] = useState(false)
+  const [showBlockDialog, setShowBlockDialog] = useState(false)
+  const [showUnblockDialog, setShowUnblockDialog] = useState(false)
   const [loadingAction, setLoadingAction] = useState<string | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -151,11 +153,20 @@ export default function ConversationMenu({
     }
   }
 
-  const handleBlockUser = async () => {
+  // Block user - shows confirmation dialog first
+  const handleBlockUserClick = () => {
+    onClose() // Close menu before opening dialog
+    setShowBlockDialog(true)
+  }
+
+  // Confirm block user
+  const handleConfirmBlock = async () => {
     if (!otherUser) return
     setLoadingAction('block')
     try {
       await userService.blockUser(otherUser.user_id)
+      // CRITICAL: Update local state
+      toggleBlockUser(otherUser.user_id)
       addToast({
         title: 'Thành công',
         message: `Đã chặn ${otherUser.name}`,
@@ -172,15 +183,24 @@ export default function ConversationMenu({
       })
     } finally {
       setLoadingAction(null)
-      onClose()
+      setShowBlockDialog(false)
     }
   }
 
-  const handleUnblockUser = async () => {
+  // Unblock user - shows confirmation dialog first
+  const handleUnblockUserClick = () => {
+    onClose() // Close menu before opening dialog
+    setShowUnblockDialog(true)
+  }
+
+  // Confirm unblock user
+  const handleConfirmUnblock = async () => {
     if (!otherUser) return
     setLoadingAction('unblock')
     try {
       await userService.unblockUser(otherUser.user_id)
+      // CRITICAL: Update local state
+      toggleBlockUser(otherUser.user_id)
       addToast({
         title: 'Thành công',
         message: `Đã bỏ chặn ${otherUser.name}`,
@@ -197,7 +217,7 @@ export default function ConversationMenu({
       })
     } finally {
       setLoadingAction(null)
-      onClose()
+      setShowUnblockDialog(false)
     }
   }
 
@@ -323,7 +343,7 @@ export default function ConversationMenu({
     MENU_ITEMS.push({
       icon: Ban,
       label: isOtherUserBlocked ? 'Bỏ chặn người dùng' : 'Chặn người dùng',
-      action: isOtherUserBlocked ? handleUnblockUser : handleBlockUser,
+      action: isOtherUserBlocked ? handleUnblockUserClick : handleBlockUserClick,
       actionType: isOtherUserBlocked ? 'unblock' : 'block',
       variant: 'danger',
     })
@@ -383,6 +403,84 @@ export default function ConversationMenu({
           )
         })}
       </div>
+
+      {/* Block User Confirmation Dialog */}
+      <Dialog open={showBlockDialog} onClose={() => setShowBlockDialog(false)}>
+        <DialogContent>
+          <DialogBody>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                <Ban className="w-5 h-5 text-red-600 dark:text-red-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-[#e4e6eb]">
+                Chặn người dùng?
+              </h3>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Bạn có chắc chắn muốn chặn <span className="font-semibold">{otherUser?.name}</span>?
+              Người này sẽ không thể gửi tin nhắn cho bạn và bạn sẽ không thấy tin nhắn từ họ.
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={() => setShowBlockDialog(false)} disabled={loadingAction === 'block'}>
+                Hủy
+              </Button>
+              <Button
+                className="bg-red-600 hover:bg-red-700 text-white"
+                onClick={handleConfirmBlock}
+                disabled={loadingAction === 'block'}
+              >
+                {loadingAction === 'block' ? (
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Đang chặn...
+                  </span>
+                ) : (
+                  'Chặn người dùng'
+                )}
+              </Button>
+            </div>
+          </DialogBody>
+        </DialogContent>
+      </Dialog>
+
+      {/* Unblock User Confirmation Dialog */}
+      <Dialog open={showUnblockDialog} onClose={() => setShowUnblockDialog(false)}>
+        <DialogContent>
+          <DialogBody>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                <Ban className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-[#e4e6eb]">
+                Bỏ chặn người dùng?
+              </h3>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Bạn có chắc chắn muốn bỏ chặn <span className="font-semibold">{otherUser?.name}</span>?
+              Người này sẽ có thể gửi tin nhắn cho bạn lại.
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={() => setShowUnblockDialog(false)} disabled={loadingAction === 'unblock'}>
+                Hủy
+              </Button>
+              <Button
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+                onClick={handleConfirmUnblock}
+                disabled={loadingAction === 'unblock'}
+              >
+                {loadingAction === 'unblock' ? (
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Đang bỏ chặn...
+                  </span>
+                ) : (
+                  'Bỏ chặn'
+                )}
+              </Button>
+            </div>
+          </DialogBody>
+        </DialogContent>
+      </Dialog>
 
       {/* Clear History Confirmation Dialog */}
       <Dialog open={showClearDialog} onClose={() => setShowClearDialog(false)}>
