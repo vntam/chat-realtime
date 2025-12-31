@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { User, Users, Check, Bell, BellOff, Pin, PinOff, EyeOff, Ban, Trash2, X, Loader2 } from 'lucide-react'
 import { useChatStore } from '@/store/chatStore'
 import { conversationSettingsService } from '@/services/conversationSettingsService'
@@ -34,6 +34,19 @@ export default function ConversationMenu({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [showClearDialog, setShowClearDialog] = useState(false)
   const [loadingAction, setLoadingAction] = useState<string | null>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        onClose()
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [onClose])
 
   const isGroup = conversation.isGroup
   const isUnread = (unreadCounts.get(conversation.id) || 0) > 0
@@ -312,6 +325,7 @@ export default function ConversationMenu({
   return (
     <>
       <div
+        ref={menuRef}
         className="w-56 bg-white dark:bg-[#242526] rounded-lg shadow-xl border border-gray-200 dark:border-[#3a3b3c] overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >

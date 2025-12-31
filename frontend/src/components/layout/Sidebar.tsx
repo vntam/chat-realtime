@@ -13,7 +13,7 @@ export default function Sidebar() {
   const isAdmin = user?.role === 'admin'
 
   return (
-    <aside className="w-80 bg-white dark:bg-[#242526] backdrop-blur-xl border-r border-gray-200 dark:border-[#3a3b3c] flex flex-col shadow-sm transition-colors duration-200">
+    <aside className="w-80 h-full bg-white dark:bg-[#242526] backdrop-blur-xl border-r border-gray-200 dark:border-[#3a3b3c] flex flex-col shadow-sm transition-colors duration-200 overflow-hidden">
       {/* Navigation Menu */}
       <nav className="p-3 border-b border-gray-200 dark:border-[#3a3b3c]">
         <NavLink

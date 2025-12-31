@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { userService } from '@/services/userService'
+import { useChatStore } from './chatStore'
 
 interface User {
   user_id: number
@@ -58,6 +59,25 @@ export const useAuthStore = create<AuthState>((set) => ({
       const user = await userService.getCurrentUser()
       console.log('[authStore] User data refreshed:', user)
       set({ user, isAuthenticated: true })
+
+      // Load conversation settings from backend
+      try {
+        console.log('[authStore] Loading conversation settings...')
+        const settings = await userService.getConversationSettings()
+        console.log('[authStore] Conversation settings loaded:', settings)
+
+        // Convert to Map format for chatStore
+        const settingsMap = new Map()
+        for (const [conversationId, setting] of Object.entries(settings)) {
+          settingsMap.set(conversationId, setting)
+        }
+
+        // Update chatStore with loaded settings
+        useChatStore.getState().setConversationSettingsMap(settingsMap)
+      } catch (error) {
+        console.error('[authStore] Failed to load conversation settings:', error)
+        // Continue anyway - settings will use localStorage defaults
+      }
     } catch (error) {
       console.error('[authStore] Failed to refresh user data:', error)
       // Don't logout on error, just log it

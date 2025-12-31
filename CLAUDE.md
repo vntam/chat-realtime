@@ -463,21 +463,49 @@ Frontend supports mock mode for development without backend:
 - **AWS_EC2_DEPLOYMENT.md** - AWS EC2 production deployment guide
 - **DEPLOYMENT_PROGRESS.md** - Deployment progress tracking
 
-## Recent Changes (Dec 2025 - Avatar Upload Feature)
+## Recent Changes
 
-### Commits
+### Avatar Upload Feature (Dec 2025)
+**Commits:**
 - `cfa3712` - Add avatar upload endpoint to User Service
 - `94b7592` - Update frontend to use new avatar upload endpoint
 - `eb4069` - Fix avatar upload to use Data URL instead of mock URL
 - `1eb695e` - Fix sender avatar display in chat messages (realtime updates)
 
-### Summary
-Avatar upload feature is now fully functional:
+**Summary:**
 - Users can upload profile pictures via Settings page
 - Avatars stored as Data URLs (base64 encoded)
 - Realtime avatar updates across all chat messages
 - Max file size: 500KB
 - Supported formats: JPEG, PNG, GIF, WebP
+
+### Username Updates & UI Fixes (Dec 2025)
+**Commits:**
+- `727cdc9` - Revert "Implement true realtime username update via WebSocket"
+- `d50e864` - Implement true realtime username update via WebSocket (reverted)
+- `ec5437d` - Fix menu clickable and realtime username update
+- `6c89377` - Add avatar to popup notifications and fix chat messages z-index
+- `80d48ce` - Fix popup notification to show username and fix options menu z-index
+
+**Summary:**
+- Popup notifications now display user avatar and username
+- Fixed z-index issues with chat messages and options menu
+- Username update via WebSocket was reverted (still under development)
+- `USER_SERVICE_URL` fixed to use public URL on Render
+
+### Bug Fixes (Dec 2025)
+**Commits:**
+- `188fdbe` - Fix USER_SERVICE_URL to use public URL on Render
+- `9904581` - Fix notification user info fetch and MetricsInterceptor crash
+- `53680d0` - Fix RabbitMQ Client injection for notifications
+- `e2a3210` - Increase axios timeout to 30s for Render cold start
+- `d68223c` - Use ClientProxyFactory for RabbitMQ client in Chat Service
+
+**Summary:**
+- Fixed RabbitMQ Client injection issues in Notification Service
+- Increased axios timeout to handle Render cold starts
+- Fixed MetricsInterceptor crash in User Service
+- Improved notification user info fetching
 
 ### Deployment
 - Frontend: https://chatrealtime-frontend-s3-2025.s3-website-ap-southeast-1.amazonaws.com

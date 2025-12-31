@@ -24,7 +24,7 @@ export default function ChatBox() {
   const [showMembersModal, setShowMembersModal] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null)
-  const menuRef = useRef<HTMLDivElement>(null)
+  const menuButtonRef = useRef<HTMLButtonElement>(null)
   // Store realtime participant info (fetched from API)
   const [participantInfos, setParticipantInfos] = useState<Map<number, ParticipantInfo>>(new Map())
 
@@ -345,25 +345,12 @@ export default function ChatBox() {
   }
 
   const handleMenuToggle = () => {
-    if (!showMenu && menuRef.current) {
-      const rect = menuRef.current.getBoundingClientRect()
+    if (!showMenu && menuButtonRef.current) {
+      const rect = menuButtonRef.current.getBoundingClientRect()
       setMenuPosition({ top: rect.bottom + 4, right: window.innerWidth - rect.right })
     }
     setShowMenu(!showMenu)
   }
-
-  // Close menu when clicking outside - MUST be before early return (Rules of Hooks)
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setShowMenu(false)
-        setMenuPosition(null)
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
 
   if (!selectedConversation) {
     return (
@@ -394,8 +381,9 @@ export default function ChatBox() {
         </div>
 
         {/* Options Menu Button */}
-        <div ref={menuRef}>
+        <div>
           <Button
+            ref={menuButtonRef}
             variant="outline"
             size="sm"
             onClick={handleMenuToggle}
@@ -413,34 +401,23 @@ export default function ChatBox() {
 
       {/* Conversation Menu - Rendered outside ChatHeader's stacking context for proper z-index */}
       {showMenu && menuPosition && (
-        <>
-          {/* Backdrop overlay - closes menu on click and prevents blocking other UI */}
-          <div
-            className="fixed inset-0 z-[99998]"
-            onClick={() => {
+        <div
+          className="fixed z-50"
+          style={{ top: `${menuPosition.top}px`, right: `${menuPosition.right}px` }}
+        >
+          <ConversationMenu
+            conversation={selectedConversation}
+            onClose={() => {
               setShowMenu(false)
               setMenuPosition(null)
             }}
+            onOpenMembers={() => {
+              setShowMenu(false)
+              setMenuPosition(null)
+              setShowMembersModal(true)
+            }}
           />
-          {/* Menu positioned at calculated location */}
-          <div
-            className="fixed z-[99999]"
-            style={{ top: `${menuPosition.top}px`, right: `${menuPosition.right}px` }}
-          >
-            <ConversationMenu
-              conversation={selectedConversation}
-              onClose={() => {
-                setShowMenu(false)
-                setMenuPosition(null)
-              }}
-              onOpenMembers={() => {
-                setShowMenu(false)
-                setMenuPosition(null)
-                setShowMembersModal(true)
-              }}
-            />
-          </div>
-        </>
+        </div>
       )}
 
       {/* Members Modal - handles all features: add member, leave, delete, nickname */}

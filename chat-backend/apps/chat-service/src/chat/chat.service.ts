@@ -1133,9 +1133,17 @@ export class ChatService {
   private async getUserConversationSettings(
     userId: number,
   ): Promise<Record<string, any>> {
-    const url = `${this.getUserServiceUrl()}/users/${userId}/conversation-settings`;
-    const response = await this.httpService.axiosRef.get(url);
-    return response.data || {};
+    try {
+      const url = `${this.getUserServiceUrl()}/users/${userId}/conversation-settings`;
+      this.logger.log(`[ChatService] Fetching conversation settings from: ${url}`);
+      const response = await this.httpService.axiosRef.get(url, { timeout: 10000 });
+      this.logger.log(`[ChatService] Got conversation settings:`, response.data);
+      return response.data || {};
+    } catch (error) {
+      this.logger.error(`[ChatService] Failed to fetch conversation settings for user ${userId}:`, error.message);
+      // Return empty settings on error - don't block the operation
+      return {};
+    }
   }
 
   /**
@@ -1146,11 +1154,23 @@ export class ChatService {
     conversationId: string,
     settings: any,
   ): Promise<void> {
-    const url = `${this.getUserServiceUrl()}/users/${userId}/conversation-settings`;
-    await this.httpService.axiosRef.patch(url, {
-      conversationId,
-      settings,
-    });
+    try {
+      const url = `${this.getUserServiceUrl()}/users/${userId}/conversation-settings`;
+      this.logger.log(`[ChatService] Updating conversation settings via: ${url}`);
+      this.logger.log(`[ChatService] Payload:`, { conversationId, settings });
+
+      const response = await this.httpService.axiosRef.patch(url, {
+        conversationId,
+        settings,
+      }, { timeout: 10000 });
+
+      this.logger.log(`[ChatService] Settings updated successfully:`, response.data);
+    } catch (error) {
+      this.logger.error(`[ChatService] Failed to update conversation settings:`, error.message);
+      this.logger.error(`[ChatService] Error details:`, error.response?.data || error.message);
+      // Re-throw to let caller handle the error
+      throw new Error(`Failed to update conversation settings: ${error.message}`);
+    }
   }
 
   /**

@@ -51,6 +51,7 @@ interface ChatState {
 
   // Conversation settings actions
   setConversationSettings: (conversationId: string, settings: any) => void
+  setConversationSettingsMap: (settingsMap: Map<string, any>) => void
   setBlockedUsers: (blockedUsers: number[]) => void
   toggleBlockUser: (userId: number) => void
 
@@ -474,6 +475,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
       // Persist to localStorage
       saveConversationSettingsToStorage(newSettings)
       return { conversationSettings: newSettings }
+    }),
+
+  setConversationSettingsMap: (settingsMap) =>
+    set(() => {
+      // Persist to localStorage
+      saveConversationSettingsToStorage(settingsMap)
+      return { conversationSettings: settingsMap }
     }),
 
   setBlockedUsers: (blockedUsers) =>

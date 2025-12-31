@@ -105,10 +105,14 @@ export default function ChatMessages() {
   // Fetch user avatars for read receipts
   useEffect(() => {
     const fetchReadUsers = async () => {
+      // Get current messages from store to avoid stale closure
+      const currentMessages = useChatStore.getState().messages
+      if (!currentMessages || currentMessages.length === 0) return
+
       const newReadUsers = new Map<string, UserAvatar[]>()
       const currentAnimated = animatedReadUsersRef.current
 
-      for (const message of messages) {
+      for (const message of currentMessages) {
         if (!message.delivery_info || message.delivery_info.length === 0) continue
 
         const readerIds = message.delivery_info
@@ -145,14 +149,18 @@ export default function ChatMessages() {
     return () => {
       animatedReadUsersRef.current.clear()
     }
-  }, [messages])
+  }, [selectedConversation?.id]) // Only run when conversation ID changes, NOT on every message update
 
   // Fetch latest info (username + avatar) for all senders in conversation (realtime updates)
   useEffect(() => {
     const fetchSenderInfos = async () => {
+      // Get current messages from store to avoid stale closure
+      const currentMessages = useChatStore.getState().messages
+      if (!currentMessages || currentMessages.length === 0) return
+
       // Get all unique sender IDs from messages
       const senderIds = new Set<number>()
-      for (const message of messages) {
+      for (const message of currentMessages) {
         if (message.sender?.id) {
           senderIds.add(parseInt(message.sender.id))
         }

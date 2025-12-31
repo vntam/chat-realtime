@@ -67,19 +67,17 @@ export default function MainLayout() {
   }, [addNotification, setUnreadCount, addToast])
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50 dark:bg-[#1c1e21] transition-colors duration-200">
-      {/* Header */}
+    <div className="h-screen flex flex-col bg-gray-50 dark:bg-[#1c1e21] transition-colors duration-200 relative z-0">
+      {/* Header - fixed height, no shrink */}
       <Header />
 
-      {/* Main Content */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar - higher z-index to stay on top */}
-        <div className="relative z-20">
-          <Sidebar />
-        </div>
+      {/* Main Content - fills remaining space */}
+      <div className="flex-1 flex overflow-hidden min-h-0">
+        {/* Sidebar */}
+        <Sidebar />
 
-        {/* Content Area - lower z-index */}
-        <main className="flex-1 flex overflow-hidden relative z-10">
+        {/* Content Area - ChatBox content */}
+        <main className="flex-1 flex overflow-hidden min-h-0">
           <Outlet />
         </main>
       </div>

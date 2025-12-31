@@ -92,7 +92,7 @@ export function Dialog({ open, onClose, children, draggable = false }: DialogPro
 
   // Use Portal to render outside the sidebar/component hierarchy
   return createPortal(
-    <div className="fixed inset-0 z-[99999] flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
@@ -102,7 +102,7 @@ export function Dialog({ open, onClose, children, draggable = false }: DialogPro
       {/* Dialog content */}
       <div
         ref={contentRef}
-        className="relative z-[99999] w-full max-w-lg mx-4"
+        className="relative z-50 w-full max-w-lg mx-4"
         style={contentStyle}
         onMouseDown={handleMouseDown}
       >

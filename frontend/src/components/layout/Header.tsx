@@ -26,7 +26,7 @@ export default function Header() {
   }
 
   return (
-    <header className="h-16 bg-white dark:bg-[#242526] backdrop-blur-xl border-b border-gray-200 dark:border-[#3a3b3c] px-6 flex items-center justify-between shadow-sm sticky top-0 z-30 transition-colors duration-300">
+    <header className="h-16 flex-shrink-0 bg-white dark:bg-[#242526] backdrop-blur-xl border-b border-gray-200 dark:border-[#3a3b3c] px-6 flex items-center justify-between shadow-sm sticky top-0 z-40 transition-colors duration-300">
       {/* App Title */}
       <div className="flex items-center gap-3">
         <div className="relative">

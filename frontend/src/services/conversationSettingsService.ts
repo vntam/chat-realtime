@@ -1,6 +1,4 @@
-import axios from 'axios'
-
-const API_URL = import.meta.env.VITE_API_GATEWAY_URL
+import axiosInstance from '@/lib/axios'
 
 /**
  * Conversation Settings Service
@@ -11,7 +9,7 @@ export const conversationSettingsService = {
    * Mute/Unmute conversation notifications
    */
   async muteConversation(conversationId: string, muted: boolean, muteUntil?: Date) {
-    return axios.post(`${API_URL}/conversations/${conversationId}/mute`, {
+    return axiosInstance.post(`/conversations/${conversationId}/mute`, {
       muted,
       muteUntil,
     })
@@ -21,7 +19,7 @@ export const conversationSettingsService = {
    * Pin/Unpin conversation
    */
   async pinConversation(conversationId: string, pinned: boolean, order?: number) {
-    return axios.post(`${API_URL}/conversations/${conversationId}/pin`, {
+    return axiosInstance.post(`/conversations/${conversationId}/pin`, {
       pinned,
       order,
     })
@@ -31,7 +29,7 @@ export const conversationSettingsService = {
    * Hide/Unhide conversation
    */
   async hideConversation(conversationId: string, hidden: boolean) {
-    return axios.post(`${API_URL}/conversations/${conversationId}/hide`, {
+    return axiosInstance.post(`/conversations/${conversationId}/hide`, {
       hidden,
     })
   },
@@ -40,13 +38,13 @@ export const conversationSettingsService = {
    * Clear chat history (delete all messages for current user only)
    */
   async clearHistory(conversationId: string) {
-    return axios.delete(`${API_URL}/conversations/${conversationId}/messages`)
+    return axiosInstance.delete(`/conversations/${conversationId}/messages`)
   },
 
   /**
    * Delete conversation (private = hide only, group = permanent delete by admin)
    */
   async deleteConversation(conversationId: string) {
-    return axios.delete(`${API_URL}/conversations/${conversationId}`)
+    return axiosInstance.delete(`/conversations/${conversationId}`)
   },
 }

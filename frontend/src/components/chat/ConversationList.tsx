@@ -236,9 +236,9 @@ export default function ConversationList() {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full min-h-0">
       {/* Search bar */}
-      <div className="p-3 border-b border-gray-200 dark:border-[#3a3b3c]">
+      <div className="p-3 border-b border-gray-200 dark:border-[#3a3b3c] flex-shrink-0">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-[#b0b3b8]" />
           <Input
@@ -252,7 +252,7 @@ export default function ConversationList() {
       </div>
 
       {/* Create conversation button */}
-      <div className="p-3 border-b border-gray-200 dark:border-[#3a3b3c]">
+      <div className="p-3 border-b border-gray-200 dark:border-[#3a3b3c] flex-shrink-0">
         <Button
           className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-lg shadow-blue-500/30 transition-smooth rounded-xl"
           size="sm"
@@ -270,7 +270,7 @@ export default function ConversationList() {
       />
 
       {/* Conversation list */}
-      <div className="flex-1 overflow-y-auto scrollbar-thin">
+      <div className="flex-1 overflow-y-auto scrollbar-thin min-h-0">
         {isLoading ? (
           <div className="p-4 space-y-3">
             {/* Loading skeleton */}
