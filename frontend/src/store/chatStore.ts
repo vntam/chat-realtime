@@ -57,6 +57,8 @@ interface ChatState {
   setConversationSettingsMap: (settingsMap: Map<string, any>) => void
   setBlockedUsers: (blockedUsers: number[]) => void
   toggleBlockUser: (userId: number) => void
+  addBlockedUser: (userId: number) => void
+  removeBlockedUser: (userId: number) => void
   setBlockedByUsers: (blockedByUsers: number[]) => void
   addBlockedByUser: (userId: number) => void
   removeBlockedByUser: (userId: number) => void
@@ -554,6 +556,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
         ? state.blockedUsers.filter((id) => id !== userId)
         : [...state.blockedUsers, userId]
       // Persist to localStorage
+      saveBlockedUsersToStorage(newBlocked)
+      return { blockedUsers: newBlocked }
+    }),
+
+  // Always add user to blocked list (used by WebSocket events, not toggle)
+  addBlockedUser: (userId) =>
+    set((state) => {
+      if (state.blockedUsers.includes(userId)) return state
+      const newBlocked = [...state.blockedUsers, userId]
+      saveBlockedUsersToStorage(newBlocked)
+      return { blockedUsers: newBlocked }
+    }),
+
+  // Always remove user from blocked list (used by WebSocket events, not toggle)
+  removeBlockedUser: (userId) =>
+    set((state) => {
+      const newBlocked = state.blockedUsers.filter((id) => id !== userId)
       saveBlockedUsersToStorage(newBlocked)
       return { blockedUsers: newBlocked }
     }),
@@ -1286,23 +1305,25 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
     }
 
-    // Handler for user blocked events
+    // Handler for user blocked events (when I block someone)
     userBlockedHandler = (data: any) => {
       console.log('Received user:blocked event:', data)
       const { targetUserId } = data
       if (targetUserId) {
         const state = get()
-        state.toggleBlockUser(targetUserId)
+        // Always add to blocked list (not toggle)
+        state.addBlockedUser(targetUserId)
       }
     }
 
-    // Handler for user unblocked events
+    // Handler for user unblocked events (when I unblock someone)
     userUnblockedHandler = (data: any) => {
       console.log('Received user:unblocked event:', data)
       const { targetUserId } = data
       if (targetUserId) {
         const state = get()
-        state.toggleBlockUser(targetUserId)
+        // Always remove from blocked list (not toggle)
+        state.removeBlockedUser(targetUserId)
       }
     }
 
