@@ -13,6 +13,10 @@ import {
 } from './schemas/conversation.schema';
 import { Message, MessageSchema } from './schemas/message.schema';
 import { Nickname, NicknameSchema } from './schemas/nickname.schema';
+import {
+  ConversationSettings,
+  ConversationSettingsSchema,
+} from './schemas/conversation-settings.schema';
 
 // RabbitMQ Client provider factory
 const notificationClientFactory = {
@@ -37,6 +41,7 @@ const notificationClientFactory = {
       { name: Conversation.name, schema: ConversationSchema },
       { name: Message.name, schema: MessageSchema },
       { name: Nickname.name, schema: NicknameSchema },
+      { name: ConversationSettings.name, schema: ConversationSettingsSchema },
     ]),
     JwtModule.register({
       secret: process.env.JWT_ACCESS_SECRET || 'supersecret_access',

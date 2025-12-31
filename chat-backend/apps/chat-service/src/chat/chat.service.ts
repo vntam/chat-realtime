@@ -18,6 +18,10 @@ import {
   MessageDocument,
   MessageStatus,
 } from './schemas/message.schema';
+import {
+  ConversationSettings,
+  ConversationSettingsDocument,
+} from './schemas/conversation-settings.schema';
 import { Nickname, NicknameDocument } from './schemas/nickname.schema';
 import {
   CreateConversationDto,
@@ -43,6 +47,8 @@ export class ChatService {
     private messageModel: Model<MessageDocument>,
     @InjectModel(Nickname.name)
     private nicknameModel: Model<NicknameDocument>,
+    @InjectModel(ConversationSettings.name)
+    private conversationSettingsModel: Model<ConversationSettingsDocument>,
     private readonly httpService: HttpService,
   ) {
     // Load pagination settings from environment variables
@@ -1121,56 +1127,90 @@ export class ChatService {
   // ============ CONVERSATION SETTINGS ============
 
   /**
-   * Helper: Get User Service URL from environment
-   */
-  private getUserServiceUrl(): string {
-    return process.env.USER_SERVICE_URL || 'http://localhost:3001';
-  }
-
-  /**
-   * Helper: Get user's conversation settings from User Service
+   * Helper: Get user's conversation settings from MongoDB
    */
   private async getUserConversationSettings(
     userId: number,
-  ): Promise<Record<string, any>> {
-    try {
-      const url = `${this.getUserServiceUrl()}/users/${userId}/conversation-settings`;
-      this.logger.log(`[ChatService] Fetching conversation settings from: ${url}`);
-      const response = await this.httpService.axiosRef.get(url, { timeout: 10000 });
-      this.logger.log(`[ChatService] Got conversation settings:`, response.data);
-      return response.data || {};
-    } catch (error) {
-      this.logger.error(`[ChatService] Failed to fetch conversation settings for user ${userId}:`, error.message);
-      // Return empty settings on error - don't block the operation
-      return {};
-    }
+    conversationId: string,
+  ): Promise<ConversationSettingsDocument | null> {
+    const settings = await this.conversationSettingsModel.findOne({
+      userId,
+      conversationId,
+    });
+    return settings;
   }
 
   /**
-   * Helper: Update user's conversation settings via User Service
+   * Helper: Get all conversation settings for a user
+   */
+  public async getAllUserConversationSettings(
+    userId: number,
+  ): Promise<Record<string, any>> {
+    const settingsList = await this.conversationSettingsModel.find({ userId });
+    const settingsMap: Record<string, any> = {};
+    for (const setting of settingsList) {
+      settingsMap[setting.conversationId] = {
+        pinned: setting.pinned,
+        pinned_order: setting.pinnedOrder,
+        muted: setting.muted,
+        muted_until: setting.mutedUntil,
+        hidden: setting.hidden,
+        hidden_at: setting.hiddenAt,
+        last_message_cleared: setting.lastMessageCleared,
+      };
+    }
+    return settingsMap;
+  }
+
+  /**
+   * Helper: Update user's conversation settings in MongoDB
    */
   private async updateUserConversationSettings(
     userId: number,
     conversationId: string,
     settings: any,
-  ): Promise<void> {
-    try {
-      const url = `${this.getUserServiceUrl()}/users/${userId}/conversation-settings`;
-      this.logger.log(`[ChatService] Updating conversation settings via: ${url}`);
-      this.logger.log(`[ChatService] Payload:`, { conversationId, settings });
+  ): Promise<ConversationSettingsDocument> {
+    // Find or create settings document
+    let doc = await this.conversationSettingsModel.findOne({
+      userId,
+      conversationId,
+    });
 
-      const response = await this.httpService.axiosRef.patch(url, {
+    if (doc) {
+      // Update existing document
+      if (settings.pinned !== undefined) {
+        doc.pinned = settings.pinned;
+        doc.pinnedOrder = settings.pinned_order;
+      }
+      if (settings.muted !== undefined) {
+        doc.muted = settings.muted;
+        doc.mutedUntil = settings.muted_until;
+      }
+      if (settings.hidden !== undefined) {
+        doc.hidden = settings.hidden;
+        doc.hiddenAt = settings.hidden_at;
+      }
+      if (settings.last_message_cleared !== undefined) {
+        doc.lastMessageCleared = settings.last_message_cleared;
+      }
+      doc.updatedAt = new Date();
+      await doc.save();
+    } else {
+      // Create new document
+      doc = await this.conversationSettingsModel.create({
+        userId,
         conversationId,
-        settings,
-      }, { timeout: 10000 });
-
-      this.logger.log(`[ChatService] Settings updated successfully:`, response.data);
-    } catch (error) {
-      this.logger.error(`[ChatService] Failed to update conversation settings:`, error.message);
-      this.logger.error(`[ChatService] Error details:`, error.response?.data || error.message);
-      // Re-throw to let caller handle the error
-      throw new Error(`Failed to update conversation settings: ${error.message}`);
+        pinned: settings.pinned || false,
+        pinnedOrder: settings.pinned_order,
+        muted: settings.muted || false,
+        mutedUntil: settings.muted_until,
+        hidden: settings.hidden || false,
+        hiddenAt: settings.hidden_at,
+        lastMessageCleared: settings.last_message_cleared,
+      });
     }
+
+    return doc;
   }
 
   /**
@@ -1206,7 +1246,7 @@ export class ChatService {
 
   /**
    * Pin/Unpin conversation
-   * Updates user's conversation_settings in User Service
+   * Updates user's conversation_settings in MongoDB
    */
   async setConversationPin(
     userId: number,
@@ -1227,10 +1267,10 @@ export class ChatService {
     }
 
     // Get current settings to determine next pin order if not provided
-    const currentSettings = await this.getUserConversationSettings(userId);
-    const currentOrder = currentSettings[conversationId]?.pinned_order || 0;
+    const currentDoc = await this.getUserConversationSettings(userId, conversationId);
+    const currentOrder = currentDoc?.pinnedOrder || 0;
 
-    // Update settings in User Service
+    // Update settings in MongoDB
     await this.updateUserConversationSettings(userId, conversationId, {
       pinned,
       pinned_order: pinned ? (order || currentOrder + 1) : null,

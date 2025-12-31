@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { userService } from '@/services/userService'
+import { chatService } from '@/services/chatService'
 import { useChatStore } from './chatStore'
 
 interface User {
@@ -62,8 +63,8 @@ export const useAuthStore = create<AuthState>((set) => ({
 
       // Load conversation settings from backend
       try {
-        console.log('[authStore] Loading conversation settings...')
-        const settings = await userService.getConversationSettings()
+        console.log('[authStore] Loading conversation settings from Chat Service...')
+        const settings = await chatService.getConversationSettings()
         console.log('[authStore] Conversation settings loaded:', settings)
 
         // Convert to Map format for chatStore

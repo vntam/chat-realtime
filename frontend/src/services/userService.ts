@@ -144,10 +144,4 @@ export const userService = {
     const response = await axiosInstance.get('/users/blocked')
     return response.data
   },
-
-  // Get conversation settings for current user
-  getConversationSettings: async (): Promise<Record<string, any>> => {
-    const response = await axiosInstance.get('/users/me/conversation-settings')
-    return response.data || {}
-  },
 }

@@ -253,4 +253,10 @@ export const chatService = {
     })
     return response.data
   },
+
+  // Get all conversation settings for current user (from Chat Service MongoDB)
+  getConversationSettings: async (): Promise<Record<string, any>> => {
+    const response = await chatAPI.get('/conversations/settings')
+    return response.data || {}
+  },
 }

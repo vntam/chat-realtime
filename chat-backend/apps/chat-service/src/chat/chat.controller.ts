@@ -309,6 +309,23 @@ export class ChatController {
     }
   }
 
+  @Get('settings')
+  @UseGuards(JwtAuthGuard)
+  async getConversationSettings(@Request() req) {
+    try {
+      const userId = req.user?.sub || req.user?.userId;
+      if (!userId) {
+        throw new HttpException('User ID not found', HttpStatus.UNAUTHORIZED);
+      }
+      return await this.chatService.getAllUserConversationSettings(userId);
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Failed to get conversation settings',
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
   // ==================================================
   // CONVERSATION SETTINGS (Mute, Pin, Hide, etc.)
   // ==================================================
