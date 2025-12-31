@@ -27,15 +27,15 @@ export default function ConversationMenu({
   onClose,
   onOpenMembers,
 }: ConversationMenuProps) {
-  // CRITICAL: Call useChatStore ONLY ONCE to avoid React error #185
-  const { blockedUsers, unreadCounts, markConversationAsRead, conversationSettings, setConversationSettings, toggleBlockUser } = useChatStore((state) => ({
-    blockedUsers: state.blockedUsers,
-    unreadCounts: state.unreadCounts,
-    markConversationAsRead: state.markConversationAsRead,
-    conversationSettings: state.conversationSettings,
-    setConversationSettings: state.setConversationSettings,
-    toggleBlockUser: state.toggleBlockUser,
-  }))
+  // Use individual selectors - this prevents infinite re-render loop
+  // Each selector only re-renders when its specific value changes
+  const blockedUsers = useChatStore((state) => state.blockedUsers)
+  const unreadCounts = useChatStore((state) => state.unreadCounts)
+  const conversationSettings = useChatStore((state) => state.conversationSettings)
+  const markConversationAsRead = useChatStore((state) => state.markConversationAsRead)
+  const setConversationSettings = useChatStore((state) => state.setConversationSettings)
+  const toggleBlockUser = useChatStore((state) => state.toggleBlockUser)
+
   const { user: currentUser } = useAuthStore()
   const { addToast } = useToastStore()
 
@@ -70,14 +70,17 @@ export default function ConversationMenu({
   // Check if the other user is blocked
   const isOtherUserBlocked = otherUser && otherUser.user_id !== undefined && blockedUsers.includes(otherUser.user_id)
 
-  console.log('[ConversationMenu] Render:', {
-    otherUser: otherUser?.name,
-    otherUserId: otherUser?.user_id,
-    isOtherUserBlocked,
-    blockedUsers,
-    isGroup,
-    conversationId: conversation.id,
-  })
+  // Only log in development to avoid performance issues
+  if (import.meta.env.DEV) {
+    console.log('[ConversationMenu] Render:', {
+      otherUser: otherUser?.name,
+      otherUserId: otherUser?.user_id,
+      isOtherUserBlocked,
+      blockedUsers,
+      isGroup,
+      conversationId: conversation.id,
+    })
+  }
 
   const handleMarkAsRead = async () => {
     try {
