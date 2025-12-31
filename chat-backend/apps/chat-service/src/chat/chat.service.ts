@@ -1400,7 +1400,7 @@ export class ChatService {
 
   /**
    * Delete conversation (override with new behavior)
-   * - Private chats: Only hide for deleter (sets hidden flag)
+   * - Private chats: Only hide for deleter (frontend handles hiding)
    * - Group chats: Only admin can delete (permanent delete for everyone)
    */
   async deleteConversation(
@@ -1409,7 +1409,7 @@ export class ChatService {
   ): Promise<void> {
     const conversation = await this.findConversationById(conversationId);
 
-    // For private chats: only hide for current user (soft delete per user)
+    // For private chats: just return success (frontend handles hiding locally)
     if (conversation.type === 'private') {
       if (!conversation.participants.includes(userId)) {
         throw new ForbiddenException(
@@ -1417,10 +1417,9 @@ export class ChatService {
         );
       }
 
-      // Just hide the conversation for this user
-      await this.setConversationHidden(userId, conversationId, true);
+      // Frontend handles hiding the conversation locally
       this.logger.log(
-        `[ChatService] Private conversation ${conversationId} hidden for user ${userId}`,
+        `[ChatService] Private conversation ${conversationId} delete requested by user ${userId} (frontend handles hiding)`,
       );
       return;
     }
