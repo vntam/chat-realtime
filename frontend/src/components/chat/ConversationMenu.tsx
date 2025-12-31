@@ -27,9 +27,17 @@ export default function ConversationMenu({
   onClose,
   onOpenMembers,
 }: ConversationMenuProps) {
-  // Use selector for blockedUsers to trigger re-render
+  // Call useChatStore ONLY ONCE - use shallow selector to get all needed state
   const blockedUsers = useChatStore((state) => state.blockedUsers)
-  const { unreadCounts, markConversationAsRead, conversationSettings, setConversationSettings, toggleBlockUser } = useChatStore()
+  const { unreadCounts, markConversationAsRead, conversationSettings, setConversationSettings, toggleBlockUser } = useChatStore(
+    (state) => ({
+      unreadCounts: state.unreadCounts,
+      markConversationAsRead: state.markConversationAsRead,
+      conversationSettings: state.conversationSettings,
+      setConversationSettings: state.setConversationSettings,
+      toggleBlockUser: state.toggleBlockUser,
+    }),
+  )
   const { user: currentUser } = useAuthStore()
   const { addToast } = useToastStore()
 
@@ -64,7 +72,14 @@ export default function ConversationMenu({
   // Check if the other user is blocked
   const isOtherUserBlocked = otherUser && otherUser.user_id !== undefined && blockedUsers.includes(otherUser.user_id)
 
-  console.log('[ConversationMenu] Render:', { otherUser: otherUser?.name, isOtherUserBlocked, blockedUsers })
+  console.log('[ConversationMenu] Render:', {
+    otherUser: otherUser?.name,
+    otherUserId: otherUser?.user_id,
+    isOtherUserBlocked,
+    blockedUsers,
+    isGroup,
+    conversationId: conversation.id,
+  })
 
   const handleMarkAsRead = async () => {
     try {
@@ -159,18 +174,22 @@ export default function ConversationMenu({
 
   // Block user - shows confirmation dialog first
   const handleBlockUserClick = () => {
+    console.log('[ConversationMenu] handleBlockUserClick called')
     onClose() // Close menu before opening dialog
     setShowBlockDialog(true)
+    console.log('[ConversationMenu] showBlockDialog set to true')
   }
 
   // Confirm block user
   const handleConfirmBlock = async () => {
+    console.log('[ConversationMenu] handleConfirmBlock called')
     if (!otherUser) return
     setLoadingAction('block')
     try {
       await userService.blockUser(otherUser.user_id)
       // CRITICAL: Update local state
       toggleBlockUser(otherUser.user_id)
+      console.log('[ConversationMenu] Block successful, toggleBlockUser called')
       addToast({
         title: 'Thành công',
         message: `Đã chặn ${otherUser.name}`,
@@ -178,7 +197,7 @@ export default function ConversationMenu({
         duration: 3000,
       })
     } catch (error) {
-      console.error('Failed to block user:', error)
+      console.error('[ConversationMenu] Block failed:', error)
       addToast({
         title: 'Lỗi',
         message: 'Không thể chặn người dùng. Vui lòng thử lại.',
@@ -193,18 +212,22 @@ export default function ConversationMenu({
 
   // Unblock user - shows confirmation dialog first
   const handleUnblockUserClick = () => {
+    console.log('[ConversationMenu] handleUnblockUserClick called')
     onClose() // Close menu before opening dialog
     setShowUnblockDialog(true)
+    console.log('[ConversationMenu] showUnblockDialog set to true')
   }
 
   // Confirm unblock user
   const handleConfirmUnblock = async () => {
+    console.log('[ConversationMenu] handleConfirmUnblock called')
     if (!otherUser) return
     setLoadingAction('unblock')
     try {
       await userService.unblockUser(otherUser.user_id)
       // CRITICAL: Update local state
       toggleBlockUser(otherUser.user_id)
+      console.log('[ConversationMenu] Unblock successful, toggleBlockUser called')
       addToast({
         title: 'Thành công',
         message: `Đã bỏ chặn ${otherUser.name}`,
@@ -212,7 +235,7 @@ export default function ConversationMenu({
         duration: 3000,
       })
     } catch (error) {
-      console.error('Failed to unblock user:', error)
+      console.error('[ConversationMenu] Unblock failed:', error)
       addToast({
         title: 'Lỗi',
         message: 'Không thể bỏ chặn người dùng. Vui lòng thử lại.',
