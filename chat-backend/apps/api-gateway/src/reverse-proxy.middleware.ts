@@ -85,12 +85,20 @@ export function createReverseProxyMiddleware(
   const wrapper: any = (req: Request, res: Response, next: any) => {
     // Handle OPTIONS preflight requests directly at gateway level
     if (req.method === 'OPTIONS') {
-      logger.log(`[CORS] Handling preflight request for ${req.headers.origin}`);
-      res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
+      const origin = req.headers.origin || '*';
+      logger.log(`[CORS] Handling preflight request for ${origin}`);
+
+      // Set CORS headers - MUST be set before sendStatus
+      res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
       res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With,X-Trace-Id');
       res.setHeader('Access-Control-Allow-Credentials', 'true');
       res.setHeader('Access-Control-Max-Age', '600');
+      res.setHeader('Vary', 'Origin');
+
+      // Log headers for debugging
+      logger.log(`[CORS] Headers set: Origin=${origin}, Methods=GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS`);
+
       res.sendStatus(204);
       return;
     }
