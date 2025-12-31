@@ -1163,6 +1163,48 @@ export class ChatService {
   }
 
   /**
+   * Check if a conversation is muted for a user
+   * Returns true if muted, false otherwise
+   */
+  public async isConversationMuted(
+    userId: number,
+    conversationId: string,
+  ): Promise<boolean> {
+    try {
+      const settings = await this.conversationSettingsModel.findOne({
+        userId,
+        conversationId,
+      });
+
+      if (!settings || !settings.muted) {
+        return false;
+      }
+
+      // Check if mute_until is set and expired
+      if (settings.mutedUntil) {
+        const muteUntil = new Date(settings.mutedUntil);
+        if (muteUntil < new Date()) {
+          // Mute expired, not muted anymore
+          this.logger.debug(
+            `[Mute Check] Conversation ${conversationId} mute expired for user ${userId}`,
+          );
+          return false;
+        }
+      }
+
+      this.logger.debug(
+        `[Mute Check] Conversation ${conversationId} is muted for user ${userId}`,
+      );
+      return true;
+    } catch (error) {
+      this.logger.error(
+        `[Mute Check] Error checking mute status: ${error.message}`,
+      );
+      return false;
+    }
+  }
+
+  /**
    * Helper: Update user's conversation settings in MongoDB
    */
   private async updateUserConversationSettings(

@@ -1090,7 +1090,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
       // Get conversation to find participants
       this.chatService
         .findConversationById(conversationId)
-        .then((conversation) => {
+        .then(async (conversation) => {
           // Get recipient IDs (exclude sender)
           const recipientIds = conversation.participants.filter(
             (id) => id !== senderId,
@@ -1126,8 +1126,24 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
             `[Notification] Notification title: ${notificationTitle}, type: ${messageType}`,
           );
 
-          // Emit event to RabbitMQ for each recipient
+          // Check mute status for each recipient and filter out muted users
+          const unmutedRecipients: number[] = [];
           for (const recipientId of recipientIds) {
+            const isMuted = await this.chatService.isConversationMuted(
+              recipientId,
+              conversationId,
+            );
+            if (!isMuted) {
+              unmutedRecipients.push(recipientId);
+            } else {
+              this.logger.debug(
+                `[Notification] Skipping muted user ${recipientId}`,
+              );
+            }
+          }
+
+          // Emit event to RabbitMQ for each unmuted recipient
+          for (const recipientId of unmutedRecipients) {
             this.logger.debug(
               `[Notification] Emitting message.created event to RabbitMQ for user ${recipientId}`,
             );
@@ -1149,7 +1165,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
           }
 
           this.logger.log(
-            `[Notification] ✅ Sent ${recipientIds.length} notification events for conversation ${conversationId}`,
+            `[Notification] ✅ Sent ${unmutedRecipients.length}/${recipientIds.length} notification events for conversation ${conversationId}`,
           );
         })
         .catch((err: any) => {
