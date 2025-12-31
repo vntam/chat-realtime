@@ -11,7 +11,7 @@ import Button from '@/components/ui/Button'
 interface MenuItem {
   icon: any
   label: string
-  action: () => void
+  action: (e?: React.MouseEvent<any>) => void
   actionType?: string
   variant?: 'danger'
 }
@@ -174,16 +174,12 @@ export default function ConversationMenu({
   }
 
   // Block user - shows confirmation dialog first
-  const handleBlockUserClick = () => {
+  const handleBlockUserClick = (e?: React.MouseEvent) => {
     console.log('[ConversationMenu] handleBlockUserClick called')
-    // DON'T close menu yet - let dialog render first
-    // onClose() // Close menu before opening dialog
+    e?.stopPropagation() // Prevent event from bubbling
     setShowBlockDialog(true)
     console.log('[ConversationMenu] showBlockDialog set to true')
-    // Close menu after a small delay to ensure dialog is rendered
-    setTimeout(() => {
-      onClose()
-    }, 100)
+    onClose() // Close menu (hides it with display:none but component stays mounted)
   }
 
   // Confirm block user
@@ -217,16 +213,12 @@ export default function ConversationMenu({
   }
 
   // Unblock user - shows confirmation dialog first
-  const handleUnblockUserClick = () => {
+  const handleUnblockUserClick = (e?: React.MouseEvent) => {
     console.log('[ConversationMenu] handleUnblockUserClick called')
-    // DON'T close menu yet - let dialog render first
-    // onClose() // Close menu before opening dialog
+    e?.stopPropagation() // Prevent event from bubbling
     setShowUnblockDialog(true)
     console.log('[ConversationMenu] showUnblockDialog set to true')
-    // Close menu after a small delay to ensure dialog is rendered
-    setTimeout(() => {
-      onClose()
-    }, 100)
+    onClose() // Close menu (hides it with display:none but component stays mounted)
   }
 
   // Confirm unblock user

@@ -400,16 +400,21 @@ export default function ChatBox() {
       <ChatInput />
 
       {/* Conversation Menu - Rendered outside ChatHeader's stacking context for proper z-index */}
-      {showMenu && menuPosition && (
+      {/* IMPORTANT: Always render to prevent unmounting when dialogs are open */}
+      {menuPosition && (
         <div
           className="fixed z-50"
-          style={{ top: `${menuPosition.top}px`, right: `${menuPosition.right}px` }}
+          style={{
+            top: `${menuPosition.top}px`,
+            right: `${menuPosition.right}px`,
+            display: showMenu ? 'block' : 'none'
+          }}
         >
           <ConversationMenu
             conversation={selectedConversation}
             onClose={() => {
               setShowMenu(false)
-              setMenuPosition(null)
+              // Don't setMenuPosition(null) - keep position to prevent unmount
             }}
             onOpenMembers={() => {
               setShowMenu(false)
