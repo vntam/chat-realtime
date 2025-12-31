@@ -41,6 +41,16 @@ export default function ChatInput() {
   // Combined check: Blocked by me OR blocked by other
   const isInputDisabled = isConversationBlocked || isBlockedByOther
 
+  // Debug logging
+  console.log('[ChatInput] Block check:', {
+    otherUserId: otherParticipant?.user_id,
+    blockedUsers,
+    blockedByUsers,
+    isConversationBlocked,
+    isBlockedByOther,
+    isInputDisabled,
+  })
+
   // Handle typing indicator
   useEffect(() => {
     const socket = getSocket()
