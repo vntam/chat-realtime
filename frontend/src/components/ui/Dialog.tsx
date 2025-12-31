@@ -72,11 +72,15 @@ export function Dialog({ open, onClose, children, draggable = false }: DialogPro
     if (open) {
       document.addEventListener('keydown', handleEscape)
       document.body.style.overflow = 'hidden'
+      // Prevent body scroll when dialog is open
+      document.body.style.paddingRight = '0px'
     }
 
     return () => {
       document.removeEventListener('keydown', handleEscape)
-      document.body.style.overflow = 'unset'
+      // Reset to empty string (reverts to CSS default)
+      document.body.style.overflow = ''
+      document.body.style.paddingRight = ''
     }
   }, [open, onClose])
 
