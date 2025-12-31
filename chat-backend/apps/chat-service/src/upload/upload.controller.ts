@@ -31,14 +31,24 @@ interface UploadBase64Dto {
 
 @ApiTags('File Upload')
 @ApiBearerAuth()
-@UseGuards(AuthGuard)
 @Controller('upload')
 export class UploadController {
   private readonly logger = new Logger(UploadController.name);
 
   constructor(private readonly uploadService: UploadService) {}
 
+  @Post('test-public')
+  @ApiOperation({ summary: 'Test endpoint without auth' })
+  async testPublic() {
+    this.logger.log('[UploadController] Test public endpoint called');
+    return {
+      message: 'Upload controller is working!',
+      timestamp: new Date().toISOString(),
+    };
+  }
+
   @Post('avatar-base64')
+  @UseGuards(AuthGuard)
   @ApiOperation({ summary: 'Upload avatar as Base64 (avoids multipart issues)' })
   @ApiResponse({
     status: 201,
