@@ -168,17 +168,45 @@ export const chatService = {
     return response.data
   },
 
-  // Upload file (for conversation avatar)
-  uploadFile: async (file: File): Promise<{ url: string }> => {
-    console.log('[chatService] uploadFile called for file:', file.name, 'size:', file.size)
-    const formData = new FormData()
-    formData.append('file', file)
+  // Upload file (for conversation avatar or chat attachments)
+  // Uses Base64 encoding to avoid multipart/form-data timeout issues
+  uploadFile: async (file: File): Promise<{ url: string; fileType?: string; fileName?: string; size?: number; mimetype?: string }> => {
+    console.log('[chatService] uploadFile called for file:', file.name, 'size:', file.size, 'type:', file.type)
 
-    const response = await chatAPI.post<{ url: string }>('/upload/single?folder=group-avatars', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
+    // Validate file size (max 10MB for Base64 to avoid memory issues)
+    const MAX_SIZE = 10 * 1024 * 1024 // 10MB
+    if (file.size > MAX_SIZE) {
+      throw new Error(`File size exceeds 10MB limit. Please choose a smaller file.`)
+    }
+
+    // Convert file to Base64
+    const base64 = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => {
+        const result = reader.result as string
+        // Extract Base64 data (remove data:image/jpeg;base64, prefix)
+        const base64Data = result.split(',')[1]
+        resolve(base64Data)
+      }
+      reader.onerror = reject
+      reader.readAsDataURL(file)
     })
+
+    console.log('[chatService] File converted to Base64, length:', base64.length)
+
+    // Send as JSON (Base64) instead of multipart/form-data
+    const response = await chatAPI.post<{
+      url: string
+      fileType?: string
+      fileName?: string
+      size?: number
+      mimetype?: string
+    }>('/upload/file-base64', {
+      fileName: file.name,
+      mimeType: file.type,
+      base64: base64,
+    })
+
     console.log('[chatService] uploadFile response:', response.data)
     return response.data
   },

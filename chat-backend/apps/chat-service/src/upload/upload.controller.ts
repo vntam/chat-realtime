@@ -88,6 +88,67 @@ export class UploadController {
     return { url: fileUrl };
   }
 
+  @Post('file-base64')
+  @ApiOperation({ summary: 'Upload file as Base64 (avoids multipart timeout issues)' })
+  @ApiResponse({
+    status: 201,
+    description: 'File uploaded successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string' },
+        fileType: { type: 'string' },
+        fileName: { type: 'string' },
+        size: { type: 'number' },
+        mimetype: { type: 'string' },
+      },
+    },
+  })
+  async uploadFileBase64(
+    @Body() dto: UploadBase64Dto,
+    @GetCurrentUser('sub') userId?: number,
+  ) {
+    this.logger.log(`[UploadController] uploadFileBase64 called - userId: ${userId}`);
+    this.logger.log(`[UploadController] fileName: ${dto.fileName}, mimeType: ${dto.mimeType}, size: ${dto.base64.length}`);
+
+    if (!dto.base64 || !dto.fileName || !dto.mimeType) {
+      throw new BadRequestException('Missing required fields: fileName, base64, mimeType');
+    }
+
+    // Convert Base64 to Buffer
+    const buffer = Buffer.from(dto.base64, 'base64');
+
+    // Create mock Multer file object
+    const file: Express.Multer.File = {
+      fieldname: 'file',
+      originalname: dto.fileName,
+      encoding: 'base64',
+      mimetype: dto.mimeType,
+      size: buffer.length,
+      buffer: buffer,
+      stream: null as any,
+      destination: '',
+      filename: '',
+      path: '',
+    };
+
+    // Use attachments folder for chat files
+    const folderPath = `attachments/${userId}`;
+    this.logger.log(`[UploadController] Starting Base64 file upload to folder: ${folderPath}`);
+
+    const fileUrl = await this.uploadService.uploadFile(file, folderPath);
+
+    this.logger.log(`[UploadController] Base64 file upload successful: ${fileUrl}`);
+
+    return {
+      url: fileUrl,
+      fileType: this.uploadService.getFileTypeCategory(dto.mimeType),
+      fileName: dto.fileName,
+      size: buffer.length,
+      mimetype: dto.mimeType,
+    };
+  }
+
   @Post('single')
   @ApiOperation({ summary: 'Upload a single file' })
   @ApiConsumes('multipart/form-data')
