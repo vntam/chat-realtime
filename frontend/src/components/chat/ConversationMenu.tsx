@@ -176,9 +176,14 @@ export default function ConversationMenu({
   // Block user - shows confirmation dialog first
   const handleBlockUserClick = () => {
     console.log('[ConversationMenu] handleBlockUserClick called')
-    onClose() // Close menu before opening dialog
+    // DON'T close menu yet - let dialog render first
+    // onClose() // Close menu before opening dialog
     setShowBlockDialog(true)
     console.log('[ConversationMenu] showBlockDialog set to true')
+    // Close menu after a small delay to ensure dialog is rendered
+    setTimeout(() => {
+      onClose()
+    }, 100)
   }
 
   // Confirm block user
@@ -214,9 +219,14 @@ export default function ConversationMenu({
   // Unblock user - shows confirmation dialog first
   const handleUnblockUserClick = () => {
     console.log('[ConversationMenu] handleUnblockUserClick called')
-    onClose() // Close menu before opening dialog
+    // DON'T close menu yet - let dialog render first
+    // onClose() // Close menu before opening dialog
     setShowUnblockDialog(true)
     console.log('[ConversationMenu] showUnblockDialog set to true')
+    // Close menu after a small delay to ensure dialog is rendered
+    setTimeout(() => {
+      onClose()
+    }, 100)
   }
 
   // Confirm unblock user
