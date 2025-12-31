@@ -57,25 +57,13 @@ export default function MembersModal({ open, onClose, conversation }: MembersMod
   const moderators = conversation?.moderator_ids || []
   const isModerator = moderators.includes(currentUser?.user_id || 0)
 
-  // Debug logging for avatar upload visibility
-  console.log('[MembersModal] Group Avatar Upload Debug:')
-  console.log('  isGroup:', isGroup)
-  console.log('  conversation:', conversation)
-  console.log('  conversation.admin_id:', conversation?.admin_id)
-  console.log('  conversation.moderator_ids:', conversation?.moderator_ids)
-  console.log('  currentUser:', currentUser)
-  console.log('  currentUser.user_id:', currentUser?.user_id)
-  console.log('  isAdmin:', isAdmin)
-  console.log('  isModerator:', isModerator)
-  console.log('  Show avatar upload:', isGroup && (isAdmin || isModerator))
-
   useEffect(() => {
     if (open && conversation) {
       fetchUsers()
       fetchMembersInfo()
       fetchNicknames()
     }
-  }, [open, conversation])
+  }, [open, conversation?.id]) // Only depend on conversation ID, not the whole object
 
   const fetchNicknames = async () => {
     if (!conversation) return

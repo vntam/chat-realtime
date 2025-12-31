@@ -289,7 +289,10 @@ export default function ConversationMenu({
   MENU_ITEMS.push({
     icon: Trash2,
     label: 'Xóa lịch sử trò chuyện',
-    action: () => setShowClearDialog(true),
+    action: () => {
+      onClose() // Close menu BEFORE opening dialog
+      setShowClearDialog(true)
+    },
     actionType: 'clearHistory',
     variant: 'danger',
   })
@@ -298,7 +301,10 @@ export default function ConversationMenu({
   MENU_ITEMS.push({
     icon: X,
     label: isGroup ? 'Xóa cuộc trò chuyện' : 'Xóa cuộc trò chuyện',
-    action: () => setShowDeleteDialog(true),
+    action: () => {
+      onClose() // Close menu BEFORE opening dialog
+      setShowDeleteDialog(true)
+    },
     actionType: 'deleteConversation',
     variant: 'danger',
   })
