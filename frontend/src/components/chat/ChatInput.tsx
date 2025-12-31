@@ -12,7 +12,13 @@ import EmojiPicker from './EmojiPicker'
 
 export default function ChatInput() {
   const { user } = useAuthStore()
-  const { selectedConversation, addMessage, updateConversationLastMessage, blockedUsers, blockedByUsers } = useChatStore()
+  // Use individual selectors to ensure re-render when blockedUsers/blockedByUsers changes
+  const selectedConversation = useChatStore((state) => state.selectedConversation)
+  const blockedUsers = useChatStore((state) => state.blockedUsers)
+  const blockedByUsers = useChatStore((state) => state.blockedByUsers)
+  const addMessage = useChatStore((state) => state.addMessage)
+  const updateConversationLastMessage = useChatStore((state) => state.updateConversationLastMessage)
+
   const [message, setMessage] = useState('')
   const [isSending, setIsSending] = useState(false)
   const [showStickerPicker, setShowStickerPicker] = useState(false)
