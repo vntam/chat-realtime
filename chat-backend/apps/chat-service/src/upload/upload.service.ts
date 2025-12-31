@@ -44,8 +44,8 @@ export class UploadService {
   constructor() {
     this.bucketName = process.env.AWS_S3_BUCKET_NAME || 'chat-uploads';
     this.region = process.env.AWS_REGION || 'us-east-1';
-    // TEMPORARY: Disable S3 for debugging
-    this.useS3 = false; // process.env.USE_S3_STORAGE === 'true';
+    // Enable S3 from environment variable
+    this.useS3 = process.env.USE_S3_STORAGE === 'true';
 
     // Load file size limits from environment variables
     this.MAX_FILE_SIZE = parseInt(process.env.MAX_FILE_SIZE || '10485760', 10); // Default 10MB
@@ -63,9 +63,9 @@ export class UploadService {
           secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
         },
       });
-      this.logger.log(`S3 upload initialized for bucket: ${this.bucketName}`);
+      this.logger.log(`S3 upload initialized for bucket: ${this.bucketName} (region: ${this.region})`);
     } else {
-      this.logger.warn('*** TEMPORARY: Using local file storage (S3 disabled for debugging) ***');
+      this.logger.warn('*** Using local file storage (S3 disabled) ***');
     }
   }
 
