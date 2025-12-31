@@ -44,4 +44,23 @@ export class SocketService implements OnModuleInit {
 
     console.log(`[SocketService] Emitted conversation:created to ${conversation.participants.length} participants`);
   }
+
+  /**
+   * Emit conversation:deleted event to all participants
+   * Used when a conversation is deleted via REST API
+   */
+  emitConversationDeleted(conversationId: string, participantIds: number[]) {
+    if (!this.server) {
+      console.warn('[SocketService] Server not initialized, cannot emit event');
+      return;
+    }
+
+    participantIds.forEach((participantId: number) => {
+      this.server!.to(`user:${participantId}`).emit('conversation:deleted', {
+        conversationId,
+      });
+    });
+
+    console.log(`[SocketService] Emitted conversation:deleted to ${participantIds.length} participants`);
+  }
 }

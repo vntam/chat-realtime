@@ -165,7 +165,24 @@ export class ChatController {
   async deleteConversation(@Param('id') id: string, @Request() req) {
     try {
       const userId = req.user?.sub || req.user?.userId;
+
+      // Get conversation first to have participants info for WebSocket event
+      const conversation = await this.chatService.findConversationById(id);
+
+      // Delete the conversation
       await this.chatService.deleteConversation(id, userId);
+
+      // Emit WebSocket event to remove conversation from all participants' lists
+      // For private chats, only emit to the user who deleted (frontend handles hiding locally)
+      // For group chats, emit to all participants (conversation is deleted for everyone)
+      if (conversation.type === 'group') {
+        // Group chat: notify all participants
+        this.socketService.emitConversationDeleted(id, conversation.participants);
+      } else {
+        // Private chat: only notify the user who deleted it
+        this.socketService.emitConversationDeleted(id, [userId]);
+      }
+
       return { message: 'Conversation deleted successfully' };
     } catch (error) {
       throw new HttpException(
