@@ -115,6 +115,20 @@ export class UploadController {
       throw new BadRequestException('Missing required fields: fileName, base64, mimeType');
     }
 
+    // TEMPORARY: Return mock URL to test request flow
+    // TODO: Fix actual upload issue
+    this.logger.log(`[UploadController] Returning mock URL for testing`);
+    const mockUrl = `data:${dto.mimeType};base64,${dto.base64}`;
+
+    return {
+      url: mockUrl,
+      fileType: this.uploadService.getFileTypeCategory(dto.mimeType),
+      fileName: dto.fileName,
+      size: dto.base64.length,
+      mimetype: dto.mimeType,
+    };
+
+    /* ORIGINAL CODE - DISABLED FOR TESTING
     // Convert Base64 to Buffer
     const buffer = Buffer.from(dto.base64, 'base64');
 
@@ -147,6 +161,7 @@ export class UploadController {
       size: buffer.length,
       mimetype: dto.mimeType,
     };
+    */
   }
 
   @Post('single')
