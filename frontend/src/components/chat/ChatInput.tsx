@@ -368,7 +368,7 @@ export default function ChatInput() {
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            disabled={isUploading || isConversationBlocked}
+            disabled={isUploading || isInputDisabled}
             className="p-2.5 rounded-xl hover:bg-gray-100 dark:hover:bg-[#3a3b3c] text-gray-500 dark:text-[#b0b3b8] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             title="Tải ảnh/file lên"
           >
@@ -386,13 +386,13 @@ export default function ChatInput() {
             placeholder={getPlaceholder()}
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            disabled={isSending || isConversationBlocked}
+            disabled={isSending || isInputDisabled}
             className="w-full bg-gray-50 dark:bg-[#1c1e21] border-gray-200 dark:border-[#3a3b3c] focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl px-4 py-3 text-sm transition-smooth text-gray-900 dark:text-[#e4e6eb] placeholder:text-gray-400 dark:placeholder:text-[#b0b3b8]"
           />
         </div>
         <Button
           type="submit"
-          disabled={isSending || isUploading || isConversationBlocked}
+          disabled={isSending || isUploading || isInputDisabled}
           className={`flex-shrink-0 px-5 py-3 rounded-xl shadow-lg transition-smooth disabled:opacity-50 disabled:cursor-not-allowed ${
             hasContent
               ? 'bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-blue-500/30'
