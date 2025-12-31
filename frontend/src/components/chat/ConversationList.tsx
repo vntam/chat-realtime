@@ -1,24 +1,29 @@
 import { useEffect, useState } from 'react'
-import { Search, Plus, Pin, BellOff, EyeOff } from 'lucide-react'
+import { Search, Plus, Pin, BellOff, EyeOff, Eye } from 'lucide-react'
 import { chatService } from '@/services/chatService'
 import type { Conversation } from '@/services/chatService'
 import { userService } from '@/services/userService'
 import { conversationSettingsService } from '@/services/conversationSettingsService'
 import { useChatStore } from '@/store/chatStore'
 import { useAuthStore } from '@/store/authStore'
+import { useToastStore } from '@/store/toastStore'
 import Input from '@/components/ui/Input'
 import Button from '@/components/ui/Button'
 import CreateConversationModal from '@/components/chat/CreateConversationModal'
 import MembersModal from '@/components/chat/MembersModal'
 import Avatar from '@/components/ui/Avatar'
+import { Dialog, DialogContent, DialogBody } from '@/components/ui/Dialog'
 
 export default function ConversationList() {
   const { user } = useAuthStore()
-  const { conversations, setConversations, selectConversation, selectedConversation, unreadCounts, markConversationAsRead, getNickname, setNicknames, conversationSettings } = useChatStore()
+  const { conversations, setConversations, selectConversation, selectedConversation, unreadCounts, markConversationAsRead, getNickname, setNicknames, conversationSettings, setConversationSettings } = useChatStore()
+  const { addToast } = useToastStore()
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showMembersModal, setShowMembersModal] = useState(false)
+  const [pendingConversation, setPendingConversation] = useState<Conversation | null>(null)
+  const [showUnhideDialog, setShowUnhideDialog] = useState(false)
 
   useEffect(() => {
     fetchConversations()
@@ -248,19 +253,14 @@ export default function ConversationList() {
     const settings = conversationSettings.get(conversation.id) || {}
     const isHidden = settings.hidden === true
 
-    // If conversation is hidden, unhide it first
+    // If conversation is hidden, show confirmation dialog first
     if (isHidden) {
-      console.log('[ConversationList] Unhiding conversation:', conversation.id)
-      try {
-        await conversationSettingsService.hideConversation(conversation.id, false)
-        // Update local state
-        useChatStore.getState().setConversationSettings(conversation.id, { hidden: false })
-      } catch (error) {
-        console.error('[ConversationList] Failed to unhide conversation:', error)
-      }
+      setPendingConversation(conversation)
+      setShowUnhideDialog(true)
+      return
     }
 
-    // Select the conversation
+    // Normal selection for non-hidden conversations
     localStorage.setItem('lastSelectedConversationId', conversation.id)
     selectConversation(conversation)
 
@@ -269,6 +269,56 @@ export default function ConversationList() {
     if (unreadCount > 0) {
       markConversationAsRead(conversation.id)
     }
+  }
+
+  // Handle unhide confirmation
+  const handleConfirmUnhide = async () => {
+    if (!pendingConversation) return
+
+    try {
+      const conversationId = pendingConversation.id
+
+      // Call API to unhide
+      await conversationSettingsService.hideConversation(conversationId, false)
+
+      // Update local state
+      setConversationSettings(conversationId, { hidden: false, hiddenAt: undefined })
+
+      // Show toast notification
+      addToast({
+        title: 'Thành công',
+        message: 'Đã bỏ ẩn cuộc trò chuyện',
+        type: 'success',
+        duration: 3000,
+      })
+
+      // Select the conversation
+      localStorage.setItem('lastSelectedConversationId', conversationId)
+      selectConversation(pendingConversation)
+
+      // Mark as read if unread
+      const unreadCount = unreadCounts.get(conversationId) || 0
+      if (unreadCount > 0) {
+        markConversationAsRead(conversationId)
+      }
+    } catch (error) {
+      console.error('[ConversationList] Failed to unhide conversation:', error)
+      addToast({
+        title: 'Lỗi',
+        message: 'Không thể bỏ ẩn cuộc trò chuyện. Vui lòng thử lại.',
+        type: 'error',
+        duration: 5000,
+      })
+    } finally {
+      setShowUnhideDialog(false)
+      setPendingConversation(null)
+    }
+  }
+
+  // Handle cancel unhide
+  const handleCancelUnhide = () => {
+    setShowUnhideDialog(false)
+    setPendingConversation(null)
   }
 
   return (
@@ -428,6 +478,36 @@ export default function ConversationList() {
           conversation={selectedConversation}
         />
       )}
+
+      {/* Unhide Confirmation Dialog */}
+      <Dialog open={showUnhideDialog} onClose={handleCancelUnhide}>
+        <DialogContent>
+          <DialogBody>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                <Eye className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-[#e4e6eb]">
+                Bỏ ẩn cuộc trò chuyện?
+              </h3>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Cuộc trò chuyện này đã bị ẩn. Bạn có muốn bỏ ẩn và hiển thị lại trong danh sách không?
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={handleCancelUnhide}>
+                Hủy
+              </Button>
+              <Button
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+                onClick={handleConfirmUnhide}
+              >
+                Bỏ ẩn
+              </Button>
+            </div>
+          </DialogBody>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
