@@ -27,7 +27,9 @@ export default function ConversationMenu({
   onClose,
   onOpenMembers,
 }: ConversationMenuProps) {
-  const { unreadCounts, markConversationAsRead, conversationSettings, setConversationSettings, blockedUsers, toggleBlockUser } = useChatStore()
+  // Use selector for blockedUsers to trigger re-render
+  const blockedUsers = useChatStore((state) => state.blockedUsers)
+  const { unreadCounts, markConversationAsRead, conversationSettings, setConversationSettings, toggleBlockUser } = useChatStore()
   const { user: currentUser } = useAuthStore()
   const { addToast } = useToastStore()
 
@@ -60,7 +62,9 @@ export default function ConversationMenu({
     : null
 
   // Check if the other user is blocked
-  const isOtherUserBlocked = otherUser && blockedUsers.includes(otherUser.user_id)
+  const isOtherUserBlocked = otherUser && otherUser.user_id !== undefined && blockedUsers.includes(otherUser.user_id)
+
+  console.log('[ConversationMenu] Render:', { otherUser: otherUser?.name, isOtherUserBlocked, blockedUsers })
 
   const handleMarkAsRead = async () => {
     try {
