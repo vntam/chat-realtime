@@ -27,17 +27,15 @@ export default function ConversationMenu({
   onClose,
   onOpenMembers,
 }: ConversationMenuProps) {
-  // Call useChatStore ONLY ONCE - use shallow selector to get all needed state
-  const blockedUsers = useChatStore((state) => state.blockedUsers)
-  const { unreadCounts, markConversationAsRead, conversationSettings, setConversationSettings, toggleBlockUser } = useChatStore(
-    (state) => ({
-      unreadCounts: state.unreadCounts,
-      markConversationAsRead: state.markConversationAsRead,
-      conversationSettings: state.conversationSettings,
-      setConversationSettings: state.setConversationSettings,
-      toggleBlockUser: state.toggleBlockUser,
-    }),
-  )
+  // CRITICAL: Call useChatStore ONLY ONCE to avoid React error #185
+  const { blockedUsers, unreadCounts, markConversationAsRead, conversationSettings, setConversationSettings, toggleBlockUser } = useChatStore((state) => ({
+    blockedUsers: state.blockedUsers,
+    unreadCounts: state.unreadCounts,
+    markConversationAsRead: state.markConversationAsRead,
+    conversationSettings: state.conversationSettings,
+    setConversationSettings: state.setConversationSettings,
+    toggleBlockUser: state.toggleBlockUser,
+  }))
   const { user: currentUser } = useAuthStore()
   const { addToast } = useToastStore()
 
