@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Search, Plus, Pin, BellOff } from 'lucide-react'
+import { Search, Plus, Pin, BellOff, EyeOff } from 'lucide-react'
 import { chatService } from '@/services/chatService'
 import type { Conversation } from '@/services/chatService'
 import { userService } from '@/services/userService'
+import { conversationSettingsService } from '@/services/conversationSettingsService'
 import { useChatStore } from '@/store/chatStore'
 import { useAuthStore } from '@/store/authStore'
 import Input from '@/components/ui/Input'
@@ -161,12 +162,19 @@ export default function ConversationList() {
   const filteredConversations = conversations
     .filter((conv) => {
       const settings = conversationSettings.get(conv.id) || {}
-      // Filter out hidden conversations
-      if (settings.hidden) {
+      const isHidden = settings.hidden === true
+      const searchLower = searchQuery.toLowerCase()
+
+      // If searching, show ALL conversations including hidden ones
+      // If NOT searching, filter out hidden conversations
+      if (!searchQuery && isHidden) {
         return false
       }
 
-      const searchLower = searchQuery.toLowerCase()
+      // If no search query, show all non-hidden conversations
+      if (!searchQuery) {
+        return true
+      }
 
       // Search by conversation name
       if (conv.name && conv.name.toLowerCase().includes(searchLower)) {
@@ -235,6 +243,34 @@ export default function ConversationList() {
     return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })
   }
 
+  // Handle conversation click with unhide logic
+  const handleConversationClick = async (conversation: Conversation) => {
+    const settings = conversationSettings.get(conversation.id) || {}
+    const isHidden = settings.hidden === true
+
+    // If conversation is hidden, unhide it first
+    if (isHidden) {
+      console.log('[ConversationList] Unhiding conversation:', conversation.id)
+      try {
+        await conversationSettingsService.hideConversation(conversation.id, false)
+        // Update local state
+        useChatStore.getState().setConversationSettings(conversation.id, { hidden: false })
+      } catch (error) {
+        console.error('[ConversationList] Failed to unhide conversation:', error)
+      }
+    }
+
+    // Select the conversation
+    localStorage.setItem('lastSelectedConversationId', conversation.id)
+    selectConversation(conversation)
+
+    // Mark as read if unread
+    const unreadCount = unreadCounts.get(conversation.id) || 0
+    if (unreadCount > 0) {
+      markConversationAsRead(conversation.id)
+    }
+  }
+
   return (
     <div className="flex flex-col h-full min-h-0">
       {/* Search bar */}
@@ -299,13 +335,7 @@ export default function ConversationList() {
             return (
               <div key={conversation.id} className="relative">
                 <button
-                  onClick={() => {
-                    localStorage.setItem('lastSelectedConversationId', conversation.id)
-                    selectConversation(conversation)
-                    if (unreadCount > 0) {
-                      markConversationAsRead(conversation.id)
-                    }
-                  }}
+                  onClick={() => handleConversationClick(conversation)}
                   className={`w-full px-4 py-3 flex items-start gap-3 transition-smooth border-b border-gray-100 dark:border-[#3a3b3c] text-left group ${
                     selectedConversation?.id === conversation.id
                       ? 'bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-l-4 border-l-blue-500'
@@ -337,6 +367,10 @@ export default function ConversationList() {
                     {/* Top line: Group name (spaced) · Time */}
                     <div className="flex items-center justify-between mb-1">
                       <div className="flex items-center gap-2">
+                        {/* Hidden indicator (only shown when searching) */}
+                        {settings.hidden && searchQuery && (
+                          <EyeOff className="w-3 h-3 text-orange-500 flex-shrink-0" />
+                        )}
                         {/* Pinned indicator */}
                         {settings.pinned && (
                           <Pin className="w-3 h-3 text-blue-500 fill-blue-500 flex-shrink-0" />
