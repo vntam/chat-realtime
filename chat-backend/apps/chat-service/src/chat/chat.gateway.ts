@@ -1408,9 +1408,14 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
         },
       );
 
-      // Emit to the blocker
+      // Emit to both users (blocker and unblocked)
       this.server.to(`user:${client.userId}`).emit('user:unblocked', {
         targetUserId: payload.targetUserId,
+      });
+
+      // Also notify the unblocked user
+      this.server.to(`user:${payload.targetUserId}`).emit('user:unblocked-by', {
+        blockerId: client.userId,
       });
 
       return this.ack(true, { targetUserId: payload.targetUserId });

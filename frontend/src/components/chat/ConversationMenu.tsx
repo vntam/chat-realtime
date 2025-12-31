@@ -2,11 +2,11 @@ import { useState, useEffect, useRef } from 'react'
 import { User, Users, Check, Bell, BellOff, Pin, PinOff, EyeOff, Ban, Trash2, X, Loader2 } from 'lucide-react'
 import { useChatStore } from '@/store/chatStore'
 import { conversationSettingsService } from '@/services/conversationSettingsService'
-import { userService } from '@/services/userService'
 import { useAuthStore } from '@/store/authStore'
 import { useToastStore } from '@/store/toastStore'
 import { Dialog, DialogContent, DialogBody } from '@/components/ui/Dialog'
 import Button from '@/components/ui/Button'
+import { getSocket } from '@/lib/socket'
 
 interface MenuItem {
   icon: any
@@ -188,7 +188,23 @@ export default function ConversationMenu({
     if (!otherUser) return
     setLoadingAction('block')
     try {
-      await userService.blockUser(otherUser.user_id)
+      // Use WebSocket instead of REST API for realtime blocking
+      const socket = getSocket()
+      if (!socket || !socket.connected) {
+        throw new Error('Mất kết nối WebSocket. Vui lòng tải lại trang.')
+      }
+
+      socket.emit(
+        'user:block',
+        { targetUserId: otherUser.user_id },
+        (response: any) => {
+          if (!response || !response.ok) {
+            throw new Error(response?.error?.message || 'Không thể chặn người dùng')
+          }
+          return response.data
+        }
+      )
+
       // CRITICAL: Update local state
       toggleBlockUser(otherUser.user_id)
       console.log('[ConversationMenu] Block successful, toggleBlockUser called')
@@ -198,11 +214,11 @@ export default function ConversationMenu({
         type: 'success',
         duration: 3000,
       })
-    } catch (error) {
+    } catch (error: any) {
       console.error('[ConversationMenu] Block failed:', error)
       addToast({
         title: 'Lỗi',
-        message: 'Không thể chặn người dùng. Vui lòng thử lại.',
+        message: error?.message || 'Không thể chặn người dùng. Vui lòng thử lại.',
         type: 'error',
         duration: 5000,
       })
@@ -227,7 +243,23 @@ export default function ConversationMenu({
     if (!otherUser) return
     setLoadingAction('unblock')
     try {
-      await userService.unblockUser(otherUser.user_id)
+      // Use WebSocket instead of REST API for realtime unblocking
+      const socket = getSocket()
+      if (!socket || !socket.connected) {
+        throw new Error('Mất kết nối WebSocket. Vui lòng tải lại trang.')
+      }
+
+      socket.emit(
+        'user:unblock',
+        { targetUserId: otherUser.user_id },
+        (response: any) => {
+          if (!response || !response.ok) {
+            throw new Error(response?.error?.message || 'Không thể bỏ chặn người dùng')
+          }
+          return response.data
+        }
+      )
+
       // CRITICAL: Update local state
       toggleBlockUser(otherUser.user_id)
       console.log('[ConversationMenu] Unblock successful, toggleBlockUser called')
@@ -237,11 +269,11 @@ export default function ConversationMenu({
         type: 'success',
         duration: 3000,
       })
-    } catch (error) {
+    } catch (error: any) {
       console.error('[ConversationMenu] Unblock failed:', error)
       addToast({
         title: 'Lỗi',
-        message: 'Không thể bỏ chặn người dùng. Vui lòng thử lại.',
+        message: error?.message || 'Không thể bỏ chặn người dùng. Vui lòng thử lại.',
         type: 'error',
         duration: 5000,
       })
