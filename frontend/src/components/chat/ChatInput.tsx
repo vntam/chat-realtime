@@ -5,7 +5,6 @@ import { getSocket } from '@/lib/socket'
 import { useAuthStore } from '@/store/authStore'
 import { useChatStore } from '@/store/chatStore'
 import { chatService } from '@/services/chatService'
-import { userService } from '@/services/userService'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import StickerPicker from './StickerPicker'
@@ -13,13 +12,12 @@ import EmojiPicker from './EmojiPicker'
 
 export default function ChatInput() {
   const { user } = useAuthStore()
-  const { selectedConversation, addMessage, updateConversationLastMessage, blockedUsers } = useChatStore()
+  const { selectedConversation, addMessage, updateConversationLastMessage, blockedUsers, blockedByUsers } = useChatStore()
   const [message, setMessage] = useState('')
   const [isSending, setIsSending] = useState(false)
   const [showStickerPicker, setShowStickerPicker] = useState(false)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
-  const [isBlockedByOther, setIsBlockedByOther] = useState(false) // NEW: Check if current user is blocked by other user
   const typingTimeoutRef = useRef<number | null>(null)
   const stickerButtonRef = useRef<HTMLButtonElement>(null)
   const emojiButtonRef = useRef<HTMLButtonElement>(null)
@@ -35,25 +33,10 @@ export default function ChatInput() {
     ? blockedUsers.includes(otherParticipant.user_id!)
     : false
 
-  // Fetch block status when conversation changes
-  useEffect(() => {
-    const fetchBlockStatus = async () => {
-      if (!otherParticipant?.user_id) {
-        setIsBlockedByOther(false)
-        return
-      }
-
-      try {
-        const result = await userService.checkIfBlockedByUser(otherParticipant.user_id)
-        setIsBlockedByOther(result.isBlocked)
-      } catch (error) {
-        console.error('[ChatInput] Failed to check block status:', error)
-        setIsBlockedByOther(false)
-      }
-    }
-
-    fetchBlockStatus()
-  }, [otherParticipant?.user_id])
+  // Check if current user is blocked by the other participant (realtime via WebSocket)
+  const isBlockedByOther = selectedConversation && !selectedConversation.isGroup && otherParticipant
+    ? blockedByUsers.includes(otherParticipant.user_id!)
+    : false
 
   // Combined check: Blocked by me OR blocked by other
   const isInputDisabled = isConversationBlocked || isBlockedByOther

@@ -3,6 +3,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { JwtModule } from '@nestjs/jwt';
 import { HttpModule } from '@nestjs/axios';
 import { ClientProxyFactory, Transport } from '@nestjs/microservices';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ChatService } from './chat.service';
 import { ChatGateway } from './chat.gateway';
 import { ChatController } from './chat.controller';
@@ -48,6 +49,7 @@ const notificationClientFactory = {
       signOptions: { expiresIn: '15m' },
     }),
     HttpModule,
+    EventEmitterModule.forRoot(),
   ],
   controllers: [ChatController],
   providers: [

@@ -29,8 +29,11 @@ interface ChatState {
     lastMessageCleared?: Date
   }>
 
-  // Blocked users list
+  // Blocked users list (users I blocked)
   blockedUsers: number[]
+
+  // Blocked by users list (users who blocked me)
+  blockedByUsers: number[]
 
   setConversations: (conversations: Conversation[]) => void
   addConversation: (conversation: Conversation) => void
@@ -54,6 +57,9 @@ interface ChatState {
   setConversationSettingsMap: (settingsMap: Map<string, any>) => void
   setBlockedUsers: (blockedUsers: number[]) => void
   toggleBlockUser: (userId: number) => void
+  setBlockedByUsers: (blockedByUsers: number[]) => void
+  addBlockedByUser: (userId: number) => void
+  removeBlockedByUser: (userId: number) => void
 
   setupWebSocketListeners: () => void
 }
@@ -81,6 +87,8 @@ let conversationHiddenHandler: ((data: any) => void) | null = null
 let conversationMessagesClearedHandler: ((data: any) => void) | null = null
 let userBlockedHandler: ((data: any) => void) | null = null
 let userUnblockedHandler: ((data: any) => void) | null = null
+let userBlockedByHandler: ((data: any) => void) | null = null
+let userUnblockedByHandler: ((data: any) => void) | null = null
 
 // Set to track received message IDs for deduplication
 const receivedMessageIds = new Set<string>()
@@ -210,6 +218,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   nicknames: loadNicknamesFromStorage(),
   conversationSettings: loadConversationSettingsFromStorage(),
   blockedUsers: loadBlockedUsersFromStorage(),
+  blockedByUsers: [], // Users who blocked me (will be updated via WebSocket events)
 
   setConversations: (conversations) => set(() => {
     // Populate lastMessage from localStorage cache if backend doesn't provide it
@@ -504,6 +513,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
       saveBlockedUsersToStorage(newBlocked)
       return { blockedUsers: newBlocked }
     }),
+
+  // Blocked by users actions (users who blocked me)
+  setBlockedByUsers: (blockedByUsers) => set({ blockedByUsers }),
+  addBlockedByUser: (userId) =>
+    set((state) => {
+      if (state.blockedByUsers.includes(userId)) return state
+      return { blockedByUsers: [...state.blockedByUsers, userId] }
+    }),
+  removeBlockedByUser: (userId) =>
+    set((state) => ({
+      blockedByUsers: state.blockedByUsers.filter((id) => id !== userId),
+    })),
 
   setupWebSocketListeners: () => {
     const socket = getSocket()
@@ -1241,6 +1262,28 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
     }
 
+    // Handler for user:blocked-by events (when someone blocks me)
+    userBlockedByHandler = (data: any) => {
+      console.log('[chatStore] Received user:blocked-by event:', data)
+      const { blockerId } = data
+      if (blockerId) {
+        const state = get()
+        state.addBlockedByUser(blockerId)
+        console.log('[chatStore] Added to blockedByUsers:', blockerId)
+      }
+    }
+
+    // Handler for user:unblocked-by events (when someone unblocks me)
+    userUnblockedByHandler = (data: any) => {
+      console.log('[chatStore] Received user:unblocked-by event:', data)
+      const { blockerId } = data
+      if (blockerId) {
+        const state = get()
+        state.removeBlockedByUser(blockerId)
+        console.log('[chatStore] Removed from blockedByUsers:', blockerId)
+      }
+    }
+
     socket.on('message:created', messageCreatedHandler)
     socket.on('message:status', messageStatusHandler)
     socket.on('conversation:created', conversationCreatedHandler)
@@ -1260,6 +1303,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
     socket.on('conversation:messages-cleared', conversationMessagesClearedHandler)
     socket.on('user:blocked', userBlockedHandler)
     socket.on('user:unblocked', userUnblockedHandler)
+    socket.on('user:blocked-by', userBlockedByHandler)
+    socket.on('user:unblocked-by', userUnblockedByHandler)
     wsListenersSetup = true
     currentSocketId = socket.id || null
 

@@ -13,6 +13,7 @@ import { Logger, UnauthorizedException, Inject, Optional } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt';
 import { ClientProxy } from '@nestjs/microservices';
 import { HttpService } from '@nestjs/axios';
+import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { ChatService } from './chat.service';
 import { SocketService } from './socket.service';
 import {
@@ -62,6 +63,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
     private readonly metricsService: MetricsService,
     private readonly socketService: SocketService,
     private readonly httpService: HttpService,
+    private readonly eventEmitter: EventEmitter2,
     @Optional() @Inject('NOTIFICATION_SERVICE')
     private readonly notificationClient: ClientProxy,
   ) {
@@ -1418,5 +1420,51 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
         message: error.message,
       });
     }
+  }
+
+  // ============================================================
+  // EVENT LISTENERS - Listen to events from other services
+  // ============================================================
+
+  /**
+   * Listen to user.blocked event from UserService
+   * When A blocks B, notify both users via WebSocket
+   */
+  @OnEvent('user.blocked')
+  handleUserBlockedEvent(payload: { blockerId: number; blockedUserId: number }) {
+    this.logger.log(`[ChatGateway] User blocked event: ${payload.blockerId} blocked ${payload.blockedUserId}`);
+
+    // Notify the blocker (A) - they blocked someone
+    this.server.to(`user:${payload.blockerId}`).emit('user:blocked', {
+      blockerId: payload.blockerId,
+      blockedUserId: payload.blockedUserId,
+    });
+
+    // Notify the blocked user (B) - they were blocked
+    this.server.to(`user:${payload.blockedUserId}`).emit('user:blocked-by', {
+      blockerId: payload.blockerId,
+      blockedUserId: payload.blockedUserId,
+    });
+  }
+
+  /**
+   * Listen to user.unblocked event from UserService
+   * When A unblocks B, notify both users via WebSocket
+   */
+  @OnEvent('user.unblocked')
+  handleUserUnblockedEvent(payload: { blockerId: number; unblockedUserId: number }) {
+    this.logger.log(`[ChatGateway] User unblocked event: ${payload.blockerId} unblocked ${payload.unblockedUserId}`);
+
+    // Notify the blocker (A) - they unblocked someone
+    this.server.to(`user:${payload.blockerId}`).emit('user:unblocked', {
+      blockerId: payload.blockerId,
+      unblockedUserId: payload.unblockedUserId,
+    });
+
+    // Notify the unblocked user (B) - they were unblocked
+    this.server.to(`user:${payload.unblockedUserId}`).emit('user:unblocked-by', {
+      blockerId: payload.blockerId,
+      unblockedUserId: payload.unblockedUserId,
+    });
   }
 }

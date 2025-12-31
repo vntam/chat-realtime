@@ -3,9 +3,11 @@ import {
   NotFoundException,
   ForbiddenException,
   ConflictException,
+  Inject,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   CreateUserDto,
   UpdateUserDto,
@@ -17,6 +19,8 @@ import {
 import { User } from './user.entity';
 import { UserRole } from '../role/user-role.entity';
 import * as bcrypt from 'bcrypt';
+import { UserBlockedEvent } from './events/user-blocked.event';
+import { UserUnblockedEvent } from './events/user-unblocked.event';
 
 @Injectable()
 export class UsersService {
@@ -26,6 +30,7 @@ export class UsersService {
   constructor(
     @InjectRepository(User) private repo: Repository<User>,
     @InjectRepository(UserRole) private userRoleRepo: Repository<UserRole>,
+    @Inject(EventEmitter2) private eventEmitter: EventEmitter2,
   ) {
     // Load pagination settings from environment variables
     this.defaultPageSize = parseInt(process.env.DEFAULT_PAGE_SIZE || '50', 10);
@@ -271,7 +276,7 @@ export class UsersService {
   // ==================================================
   /**
    * Block a user - adds targetUserId to current user's blocked_users list
-   * Also emits WebSocket events (handled by Chat Gateway)
+   * Emits event for WebSocket to notify users
    */
   async blockUser(currentUserId: number, targetUserId: number): Promise<UserResponseDto> {
     if (currentUserId === targetUserId) {
@@ -292,11 +297,18 @@ export class UsersService {
     user.blocked_users = [...(user.blocked_users || []), targetUserId];
     const saved = await this.repo.save(user);
 
+    // Emit event for WebSocket gateway to notify both users
+    this.eventEmitter.emit(
+      'user.blocked',
+      new UserBlockedEvent(currentUserId, targetUserId),
+    );
+
     return this.toResponse(saved);
   }
 
   /**
    * Unblock a user - removes targetUserId from current user's blocked_users list
+   * Emits event for WebSocket to notify users
    */
   async unblockUser(currentUserId: number, targetUserId: number): Promise<UserResponseDto> {
     const user = await this.repo.findOne({ where: { user_id: currentUserId } });
@@ -307,6 +319,12 @@ export class UsersService {
     // Remove from blocked_users array
     user.blocked_users = (user.blocked_users || []).filter((id) => id !== targetUserId);
     const saved = await this.repo.save(user);
+
+    // Emit event for WebSocket gateway to notify both users
+    this.eventEmitter.emit(
+      'user.unblocked',
+      new UserUnblockedEvent(currentUserId, targetUserId),
+    );
 
     return this.toResponse(saved);
   }
