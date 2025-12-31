@@ -27,7 +27,7 @@ export default function ConversationMenu({
   onClose,
   onOpenMembers,
 }: ConversationMenuProps) {
-  const { unreadCounts, markConversationAsRead, conversationSettings, setConversationSettings } = useChatStore()
+  const { unreadCounts, markConversationAsRead, conversationSettings, setConversationSettings, blockedUsers } = useChatStore()
   const { user: currentUser } = useAuthStore()
   const { addToast } = useToastStore()
 
@@ -56,6 +56,9 @@ export default function ConversationMenu({
   const otherUser = !isGroup && conversation.participants
     ? conversation.participants.find((p: any) => p.user_id !== currentUser?.user_id)
     : null
+
+  // Check if the other user is blocked
+  const isOtherUserBlocked = otherUser && blockedUsers.includes(otherUser.user_id)
 
   const handleMarkAsRead = async () => {
     try {
@@ -123,8 +126,11 @@ export default function ConversationMenu({
   const handleHide = async () => {
     setLoadingAction('hide')
     try {
+      console.log('[ConversationMenu] Hiding conversation:', conversation.id)
       await conversationSettingsService.hideConversation(conversation.id, true)
+      console.log('[ConversationMenu] API call successful, updating local state...')
       setConversationSettings(conversation.id, { hidden: true, hiddenAt: new Date() })
+      console.log('[ConversationMenu] Local state updated')
       addToast({
         title: 'Thành công',
         message: 'Đã ẩn cuộc trò chuyện',
@@ -132,7 +138,7 @@ export default function ConversationMenu({
         duration: 3000,
       })
     } catch (error) {
-      console.error('Failed to hide conversation:', error)
+      console.error('[ConversationMenu] Failed to hide conversation:', error)
       addToast({
         title: 'Lỗi',
         message: 'Không thể ẩn cuộc trò chuyện. Vui lòng thử lại.',
@@ -161,6 +167,31 @@ export default function ConversationMenu({
       addToast({
         title: 'Lỗi',
         message: 'Không thể chặn người dùng. Vui lòng thử lại.',
+        type: 'error',
+        duration: 5000,
+      })
+    } finally {
+      setLoadingAction(null)
+      onClose()
+    }
+  }
+
+  const handleUnblockUser = async () => {
+    if (!otherUser) return
+    setLoadingAction('unblock')
+    try {
+      await userService.unblockUser(otherUser.user_id)
+      addToast({
+        title: 'Thành công',
+        message: `Đã bỏ chặn ${otherUser.name}`,
+        type: 'success',
+        duration: 3000,
+      })
+    } catch (error) {
+      console.error('Failed to unblock user:', error)
+      addToast({
+        title: 'Lỗi',
+        message: 'Không thể bỏ chặn người dùng. Vui lòng thử lại.',
         type: 'error',
         duration: 5000,
       })
@@ -287,13 +318,13 @@ export default function ConversationMenu({
     actionType: 'hide',
   })
 
-  // Block user (private chat only)
-  if (!isGroup) {
+  // Block/Unblock user (private chat only)
+  if (!isGroup && otherUser) {
     MENU_ITEMS.push({
       icon: Ban,
-      label: 'Chặn người dùng',
-      action: handleBlockUser,
-      actionType: 'block',
+      label: isOtherUserBlocked ? 'Bỏ chặn người dùng' : 'Chặn người dùng',
+      action: isOtherUserBlocked ? handleUnblockUser : handleBlockUser,
+      actionType: isOtherUserBlocked ? 'unblock' : 'block',
       variant: 'danger',
     })
   }

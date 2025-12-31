@@ -469,11 +469,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
   // Conversation settings actions
   setConversationSettings: (conversationId, settings) =>
     set((state) => {
+      console.log('[chatStore] setConversationSettings called:', { conversationId, settings })
       const newSettings = new Map(state.conversationSettings)
       const currentSettings = newSettings.get(conversationId) || {}
       newSettings.set(conversationId, { ...currentSettings, ...settings })
+      console.log('[chatStore] New settings Map:', Array.from(newSettings.entries()))
       // Persist to localStorage
       saveConversationSettingsToStorage(newSettings)
+      console.log('[chatStore] Returning new state with conversationSettings')
       return { conversationSettings: newSettings }
     }),
 
@@ -665,13 +668,24 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const state = get()
       const currentUser = useAuthStore.getState().user
 
+      // Check if message is from current user
+      const isFromCurrentUser = senderId === currentUser?.user_id
+
+      // CRITICAL: Check if sender is blocked by current user
+      // If blocked, ignore the message completely
+      const isFromBlockedUser = !isSystemMessage && !isFromCurrentUser && state.blockedUsers.includes(senderId)
+      if (isFromBlockedUser) {
+        console.log('[chatStore] Message from blocked user, ignoring:', senderId)
+        // Don't add message, don't update conversation, don't increment unread
+        return
+      }
+
       state.addMessage(transformedMessage)
       if (transformedMessage.conversationId) {
         state.updateConversationLastMessage(transformedMessage.conversationId, transformedMessage)
 
         // Increment unread count if message is from another user
         // AND conversation is not currently selected
-        const isFromCurrentUser = senderId === currentUser?.user_id
         const isSelectedConversation = state.selectedConversation?.id === transformedMessage.conversationId
 
         if (!isSystemMessage && !isFromCurrentUser && !isSelectedConversation) {
@@ -1184,13 +1198,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
           hiddenAt: hidden ? new Date() : undefined,
         })
 
-        // If conversation was hidden, remove it from the list
-        if (hidden) {
-          set((state) => ({
-            conversations: state.conversations.filter((c) => c.id !== conversationId),
-            selectedConversation: state.selectedConversation?.id === conversationId ? null : state.selectedConversation,
-          }))
-        }
+        // DON'T remove from conversations array - it should stay in the source
+        // Only filter for display in ConversationList.tsx
+        console.log('[chatStore] Conversation hidden state updated, keeping in source array:', conversationId)
       }
     }
 

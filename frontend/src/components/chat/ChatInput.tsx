@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import type { FormEvent } from 'react'
-import { Send, ThumbsUp, Smile, Image } from 'lucide-react'
+import { Send, ThumbsUp, Smile, Image, Ban } from 'lucide-react'
 import { getSocket } from '@/lib/socket'
 import { useAuthStore } from '@/store/authStore'
 import { useChatStore } from '@/store/chatStore'
@@ -12,7 +12,7 @@ import EmojiPicker from './EmojiPicker'
 
 export default function ChatInput() {
   const { user } = useAuthStore()
-  const { selectedConversation, addMessage, updateConversationLastMessage } = useChatStore()
+  const { selectedConversation, addMessage, updateConversationLastMessage, blockedUsers } = useChatStore()
   const [message, setMessage] = useState('')
   const [isSending, setIsSending] = useState(false)
   const [showStickerPicker, setShowStickerPicker] = useState(false)
@@ -22,6 +22,11 @@ export default function ChatInput() {
   const stickerButtonRef = useRef<HTMLButtonElement>(null)
   const emojiButtonRef = useRef<HTMLButtonElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Check if the other participant in private chat is blocked
+  const isConversationBlocked = selectedConversation && !selectedConversation.isGroup
+    ? selectedConversation.participants.some((p) => p.user_id !== undefined && p.user_id !== user?.user_id && blockedUsers.includes(p.user_id))
+    : false
 
   // Handle typing indicator
   useEffect(() => {
@@ -231,8 +236,23 @@ export default function ChatInput() {
 
   const hasContent = message.trim().length > 0
 
+  // Get blocked user name for display
+  const blockedUserName = isConversationBlocked
+    ? selectedConversation?.participants.find((p) => p.user_id !== undefined && p.user_id !== user?.user_id && blockedUsers.includes(p.user_id))?.name
+    : null
+
   return (
     <div className="p-4 bg-white dark:bg-[#242526] border-t border-gray-200 dark:border-[#3a3b3c] relative z-50">
+      {/* Blocked User Notice */}
+      {isConversationBlocked && (
+        <div className="mb-3 px-4 py-2 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg flex items-center gap-2">
+          <Ban className="w-4 h-4 text-orange-600 dark:text-orange-400 flex-shrink-0" />
+          <p className="text-sm text-orange-800 dark:text-orange-300">
+            Bạn đã chặn <span className="font-semibold">{blockedUserName}</span>. Để nhắn tin, hãy bỏ chặn người này từ menu.
+          </p>
+        </div>
+      )}
+
       <form onSubmit={hasContent ? handleSubmit : handleLikeSubmit} className="flex gap-2 items-end relative">
         {/* Emoji Picker Button - inserts emoji into text */}
         <div className="relative">
@@ -240,7 +260,8 @@ export default function ChatInput() {
             ref={emojiButtonRef}
             type="button"
             onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-            className="p-2.5 rounded-xl hover:bg-gray-100 dark:hover:bg-[#3a3b3c] text-gray-500 dark:text-[#b0b3b8] transition-colors"
+            disabled={isConversationBlocked}
+            className="p-2.5 rounded-xl hover:bg-gray-100 dark:hover:bg-[#3a3b3c] text-gray-500 dark:text-[#b0b3b8] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             title="Emoji"
           >
             <Smile className="w-5 h-5" />
@@ -261,7 +282,8 @@ export default function ChatInput() {
             ref={stickerButtonRef}
             type="button"
             onClick={() => setShowStickerPicker(!showStickerPicker)}
-            className="p-2.5 rounded-xl hover:bg-gray-100 dark:hover:bg-[#3a3b3c] text-gray-500 dark:text-[#b0b3b8] transition-colors"
+            disabled={isConversationBlocked}
+            className="p-2.5 rounded-xl hover:bg-gray-100 dark:hover:bg-[#3a3b3c] text-gray-500 dark:text-[#b0b3b8] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             title="Sticker"
           >
             😊
@@ -287,7 +309,7 @@ export default function ChatInput() {
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            disabled={isUploading}
+            disabled={isUploading || isConversationBlocked}
             className="p-2.5 rounded-xl hover:bg-gray-100 dark:hover:bg-[#3a3b3c] text-gray-500 dark:text-[#b0b3b8] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             title="Tải ảnh/file lên"
           >
@@ -302,16 +324,16 @@ export default function ChatInput() {
         <div className="flex-1">
           <Input
             type="text"
-            placeholder="Nhập tin nhắn..."
+            placeholder={isConversationBlocked ? "Người dùng đã bị chặn" : "Nhập tin nhắn..."}
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            disabled={isSending}
+            disabled={isSending || isConversationBlocked}
             className="w-full bg-gray-50 dark:bg-[#1c1e21] border-gray-200 dark:border-[#3a3b3c] focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl px-4 py-3 text-sm transition-smooth text-gray-900 dark:text-[#e4e6eb] placeholder:text-gray-400 dark:placeholder:text-[#b0b3b8]"
           />
         </div>
         <Button
           type="submit"
-          disabled={isSending || isUploading}
+          disabled={isSending || isUploading || isConversationBlocked}
           className={`flex-shrink-0 px-5 py-3 rounded-xl shadow-lg transition-smooth disabled:opacity-50 disabled:cursor-not-allowed ${
             hasContent
               ? 'bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-blue-500/30'

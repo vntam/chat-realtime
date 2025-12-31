@@ -334,6 +334,36 @@ export class UsersService {
     return blockedUsers.map((u) => this.toPublicResponse(u));
   }
 
+  /**
+   * Check if a user has blocked another user
+   * Returns true if userId has blocked targetUserId
+   */
+  async isUserBlocked(userId: number, targetUserId: number): Promise<boolean> {
+    const user = await this.repo.findOne({
+      where: { user_id: userId },
+      select: ['user_id', 'blocked_users'],
+    });
+
+    if (!user || !user.blocked_users || user.blocked_users.length === 0) {
+      return false;
+    }
+
+    return user.blocked_users.includes(targetUserId);
+  }
+
+  /**
+   * Get blocked_users list for a user (internal use)
+   * Returns array of blocked user IDs
+   */
+  async getBlockedUserIds(userId: number): Promise<number[]> {
+    const user = await this.repo.findOne({
+      where: { user_id: userId },
+      select: ['user_id', 'blocked_users'],
+    });
+
+    return user?.blocked_users || [];
+  }
+
   // ==================================================
   // CONVERSATION SETTINGS
   // ==================================================

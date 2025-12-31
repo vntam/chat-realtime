@@ -16,7 +16,9 @@ import { Dialog, DialogContent, DialogBody } from '@/components/ui/Dialog'
 
 export default function ConversationList() {
   const { user } = useAuthStore()
-  const { conversations, setConversations, selectConversation, selectedConversation, unreadCounts, markConversationAsRead, getNickname, setNicknames, conversationSettings, setConversationSettings } = useChatStore()
+  const { conversations, setConversations, selectConversation, selectedConversation, unreadCounts, markConversationAsRead, getNickname, setNicknames, setConversationSettings } = useChatStore()
+  // Use shallow selector for conversationSettings to force re-render on ANY Map change
+  const conversationSettings = useChatStore((state) => state.conversationSettings)
   const { addToast } = useToastStore()
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
@@ -28,6 +30,12 @@ export default function ConversationList() {
   useEffect(() => {
     fetchConversations()
   }, [])
+
+  // Debug: Log when conversationSettings changes
+  useEffect(() => {
+    console.log('[ConversationList] conversationSettings changed, size:', conversationSettings.size)
+    console.log('[ConversationList] conversationSettings entries:', Array.from(conversationSettings.entries()))
+  }, [conversationSettings])
 
   // Auto-select saved conversation after conversations are loaded
   useEffect(() => {
@@ -170,9 +178,21 @@ export default function ConversationList() {
       const isHidden = settings.hidden === true
       const searchLower = searchQuery.toLowerCase()
 
+      // Debug: Log every conversation during filtering when searching
+      if (searchQuery) {
+        console.log('[ConversationList] Filtering conversation:', {
+          id: conv.id,
+          name: conv.name || conv.participants[0]?.name,
+          searchQuery,
+          isHidden,
+          willShow: !(!searchQuery && isHidden) // Will show if not (no search AND hidden)
+        })
+      }
+
       // If searching, show ALL conversations including hidden ones
       // If NOT searching, filter out hidden conversations
       if (!searchQuery && isHidden) {
+        console.log('[ConversationList] Filtering out hidden conversation (no search):', conv.id)
         return false
       }
 
@@ -181,15 +201,25 @@ export default function ConversationList() {
         return true
       }
 
+      // Debug: Log when hidden conversation passes filter
+      if (isHidden) {
+        console.log('[ConversationList] Hidden conversation WOULD BE SHOWN in search:', conv.id)
+      }
+
       // Search by conversation name
       if (conv.name && conv.name.toLowerCase().includes(searchLower)) {
+        console.log('[ConversationList] Matched by conversation name:', conv.name)
         return true
       }
 
       // Search by participant names
-      return conv.participants.some(
+      const matched = conv.participants.some(
         (p) => p.name?.toLowerCase().includes(searchLower) || p.email?.toLowerCase().includes(searchLower)
       )
+      if (matched && isHidden) {
+        console.log('[ConversationList] Hidden conversation matched by participant name!')
+      }
+      return matched
     })
     .sort((a, b) => {
       const aSettings = conversationSettings.get(a.id) || {}
