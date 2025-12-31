@@ -186,10 +186,29 @@ const saveBlockedUsersToStorage = (blockedUsers: number[]) => {
 const saveMessagesToStorage = (conversationId: string | undefined, messages: Message[]) => {
   if (!conversationId) return
   try {
-    localStorage.setItem(`chat_messages_${conversationId}`, JSON.stringify(messages))
-    console.log('[chatStore] Saved', messages.length, 'messages to localStorage for conversation:', conversationId)
+    // Only keep the last 100 messages to avoid localStorage quota exceeded
+    const MAX_MESSAGES = 100
+    const messagesToSave = messages.slice(-MAX_MESSAGES)
+    localStorage.setItem(`chat_messages_${conversationId}`, JSON.stringify(messagesToSave))
+    const total = messages.length
+    const saved = messagesToSave.length
+    if (total > saved) {
+      console.log('[chatStore] Saved', saved, 'of', total, 'messages to localStorage for conversation:', conversationId, '(limited to', MAX_MESSAGES, ')')
+    } else {
+      console.log('[chatStore] Saved', saved, 'messages to localStorage for conversation:', conversationId)
+    }
   } catch (e) {
     console.error('[chatStore] Failed to save messages to localStorage:', e)
+    // If still fails even with 100 messages, try with even fewer
+    if (messages.length > 50) {
+      try {
+        const messagesToSave = messages.slice(-50)
+        localStorage.setItem(`chat_messages_${conversationId}`, JSON.stringify(messagesToSave))
+        console.log('[chatStore] Saved 50 messages (fallback) for conversation:', conversationId)
+      } catch (e2) {
+        console.error('[chatStore] Even fallback failed:', e2)
+      }
+    }
   }
 }
 
@@ -208,6 +227,31 @@ const loadMessagesFromStorage = (conversationId: string | undefined): Message[] 
   }
   return []
 }
+
+// One-time cleanup: clear ALL old message caches to free up space immediately
+// This runs once when the store module loads
+const cleanupAllOldMessageCaches = () => {
+  try {
+    const allKeys = Object.keys(localStorage)
+    let removedCount = 0
+
+    for (const key of allKeys) {
+      if (key.startsWith('chat_messages_')) {
+        localStorage.removeItem(key)
+        removedCount++
+      }
+    }
+
+    if (removedCount > 0) {
+      console.log('[chatStore] One-time cleanup: removed', removedCount, 'cached message(s) from localStorage')
+    }
+  } catch (e) {
+    console.error('[chatStore] Failed to cleanup old message caches:', e)
+  }
+}
+
+// Run cleanup immediately when module loads
+cleanupAllOldMessageCaches()
 
 export const useChatStore = create<ChatState>((set, get) => ({
   conversations: [],

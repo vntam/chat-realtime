@@ -30,6 +30,7 @@ import { MetricsService } from '@app/common';
 
 interface AuthSocket extends Socket {
   userId?: number;
+  token?: string; // Store JWT token for API calls
 }
 
 interface WsAck {
@@ -97,6 +98,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
       });
 
       client.userId = payload.sub;
+      client.token = token; // Store token for later API calls
 
       // Join user's personal room
       await client.join(`user:${client.userId}`);
@@ -1348,7 +1350,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
     @MessageBody() payload: { targetUserId: number },
   ): Promise<WsAck> {
     try {
-      if (!client.userId) {
+      if (!client.userId || !client.token) {
         throw new UnauthorizedException('Not authenticated');
       }
 
@@ -1359,7 +1361,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
         {},
         {
           headers: {
-            Authorization: client.handshake.headers.authorization,
+            Authorization: `Bearer ${client.token}`,
           },
         },
       );
@@ -1393,7 +1395,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
     @MessageBody() payload: { targetUserId: number },
   ): Promise<WsAck> {
     try {
-      if (!client.userId) {
+      if (!client.userId || !client.token) {
         throw new UnauthorizedException('Not authenticated');
       }
 
@@ -1403,7 +1405,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
         `${userServiceUrl}/users/block/${payload.targetUserId}`,
         {
           headers: {
-            Authorization: client.handshake.headers.authorization,
+            Authorization: `Bearer ${client.token}`,
           },
         },
       );
