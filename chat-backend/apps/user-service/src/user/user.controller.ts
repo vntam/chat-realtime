@@ -242,6 +242,21 @@ export class UsersController {
     return { isBlocked };
   }
 
+  /**
+   * Check if another user has blocked current user
+   * Path param: id - the user to check if they blocked current user
+   */
+  @UseGuards(JwtGuard)
+  @Get(':id/blocked/by-me')
+  async checkIfBlockedByUser(
+    @Param('id', ParseIntPipe) otherUserId: number,
+    @GetCurrentUser('sub') currentUserId: number,
+  ) {
+    this.logger.log(`[UsersController] Checking if user ${otherUserId} has blocked current user ${currentUserId}`);
+    const isBlocked = await this.usersService.isUserBlocked(otherUserId, currentUserId);
+    return { isBlocked };
+  }
+
   // ============================================
   // CONVERSATION SETTINGS (per-user settings)
   // ============================================

@@ -144,4 +144,10 @@ export const userService = {
     const response = await axiosInstance.get('/users/blocked')
     return response.data
   },
+
+  // Check if another user has blocked current user
+  checkIfBlockedByUser: async (otherUserId: number): Promise<{ isBlocked: boolean }> => {
+    const response = await axiosInstance.get(`/users/${otherUserId}/blocked/by-me`)
+    return response.data
+  },
 }

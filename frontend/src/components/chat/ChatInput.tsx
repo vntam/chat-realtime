@@ -5,6 +5,7 @@ import { getSocket } from '@/lib/socket'
 import { useAuthStore } from '@/store/authStore'
 import { useChatStore } from '@/store/chatStore'
 import { chatService } from '@/services/chatService'
+import { userService } from '@/services/userService'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import StickerPicker from './StickerPicker'
@@ -18,15 +19,44 @@ export default function ChatInput() {
   const [showStickerPicker, setShowStickerPicker] = useState(false)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
+  const [isBlockedByOther, setIsBlockedByOther] = useState(false) // NEW: Check if current user is blocked by other user
   const typingTimeoutRef = useRef<number | null>(null)
   const stickerButtonRef = useRef<HTMLButtonElement>(null)
   const emojiButtonRef = useRef<HTMLButtonElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Check if the other participant in private chat is blocked
-  const isConversationBlocked = selectedConversation && !selectedConversation.isGroup
-    ? selectedConversation.participants.some((p) => p.user_id !== undefined && p.user_id !== user?.user_id && blockedUsers.includes(p.user_id))
+  // Get the other participant
+  const otherParticipant = selectedConversation && !selectedConversation.isGroup
+    ? selectedConversation.participants.find((p) => p.user_id !== undefined && p.user_id !== user?.user_id)
+    : null
+
+  // Check if current user has blocked the other participant
+  const isConversationBlocked = selectedConversation && !selectedConversation.isGroup && otherParticipant
+    ? blockedUsers.includes(otherParticipant.user_id!)
     : false
+
+  // Fetch block status when conversation changes
+  useEffect(() => {
+    const fetchBlockStatus = async () => {
+      if (!otherParticipant?.user_id) {
+        setIsBlockedByOther(false)
+        return
+      }
+
+      try {
+        const result = await userService.checkIfBlockedByUser(otherParticipant.user_id)
+        setIsBlockedByOther(result.isBlocked)
+      } catch (error) {
+        console.error('[ChatInput] Failed to check block status:', error)
+        setIsBlockedByOther(false)
+      }
+    }
+
+    fetchBlockStatus()
+  }, [otherParticipant?.user_id])
+
+  // Combined check: Blocked by me OR blocked by other
+  const isInputDisabled = isConversationBlocked || isBlockedByOther
 
   // Handle typing indicator
   useEffect(() => {
@@ -237,18 +267,48 @@ export default function ChatInput() {
   const hasContent = message.trim().length > 0
 
   // Get blocked user name for display
-  const blockedUserName = isConversationBlocked
-    ? selectedConversation?.participants.find((p) => p.user_id !== undefined && p.user_id !== user?.user_id && blockedUsers.includes(p.user_id))?.name
+  const blockedUserName = isConversationBlocked && otherParticipant
+    ? otherParticipant.name
     : null
+
+  // Determine which message to show
+  const getBlockedMessage = () => {
+    if (isBlockedByOther) {
+      return {
+        icon: <Ban className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0" />,
+        message: <>Bạn đã bị <span className="font-semibold">{otherParticipant?.name}</span> chặn. Không thể nhắn tin.</>,
+        bgClass: 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800',
+        textClass: 'text-red-800 dark:text-red-300',
+      }
+    }
+    if (isConversationBlocked) {
+      return {
+        icon: <Ban className="w-4 h-4 text-orange-600 dark:text-orange-400 flex-shrink-0" />,
+        message: <>Bạn đã chặn <span className="font-semibold">{blockedUserName}</span>. Để nhắn tin, hãy bỏ chặn người này từ menu.</>,
+        bgClass: 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800',
+        textClass: 'text-orange-800 dark:text-orange-300',
+      }
+    }
+    return null
+  }
+
+  const blockedMessage = getBlockedMessage()
+
+  // Get placeholder text
+  const getPlaceholder = () => {
+    if (isBlockedByOther) return 'Người dùng đã chặn bạn'
+    if (isConversationBlocked) return 'Người dùng đã bị chặn'
+    return 'Nhập tin nhắn...'
+  }
 
   return (
     <div className="p-4 bg-white dark:bg-[#242526] border-t border-gray-200 dark:border-[#3a3b3c] relative z-50">
       {/* Blocked User Notice */}
-      {isConversationBlocked && (
-        <div className="mb-3 px-4 py-2 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg flex items-center gap-2">
-          <Ban className="w-4 h-4 text-orange-600 dark:text-orange-400 flex-shrink-0" />
-          <p className="text-sm text-orange-800 dark:text-orange-300">
-            Bạn đã chặn <span className="font-semibold">{blockedUserName}</span>. Để nhắn tin, hãy bỏ chặn người này từ menu.
+      {blockedMessage && (
+        <div className={`mb-3 px-4 py-2 border rounded-lg flex items-center gap-2 ${blockedMessage.bgClass}`}>
+          {blockedMessage.icon}
+          <p className={`text-sm ${blockedMessage.textClass}`}>
+            {blockedMessage.message}
           </p>
         </div>
       )}
@@ -260,7 +320,7 @@ export default function ChatInput() {
             ref={emojiButtonRef}
             type="button"
             onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-            disabled={isConversationBlocked}
+            disabled={isInputDisabled}
             className="p-2.5 rounded-xl hover:bg-gray-100 dark:hover:bg-[#3a3b3c] text-gray-500 dark:text-[#b0b3b8] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             title="Emoji"
           >
@@ -282,7 +342,7 @@ export default function ChatInput() {
             ref={stickerButtonRef}
             type="button"
             onClick={() => setShowStickerPicker(!showStickerPicker)}
-            disabled={isConversationBlocked}
+            disabled={isInputDisabled}
             className="p-2.5 rounded-xl hover:bg-gray-100 dark:hover:bg-[#3a3b3c] text-gray-500 dark:text-[#b0b3b8] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             title="Sticker"
           >
@@ -324,7 +384,7 @@ export default function ChatInput() {
         <div className="flex-1">
           <Input
             type="text"
-            placeholder={isConversationBlocked ? "Người dùng đã bị chặn" : "Nhập tin nhắn..."}
+            placeholder={getPlaceholder()}
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             disabled={isSending || isConversationBlocked}
