@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from 'react'
+import { useState } from 'react'
 import { User, Users, Check, Bell, BellOff, Pin, PinOff, EyeOff, Ban, Trash2, X, Loader2 } from 'lucide-react'
 import { useChatStore } from '@/store/chatStore'
 import { conversationSettingsService } from '@/services/conversationSettingsService'
@@ -30,7 +30,6 @@ export default function ConversationMenu({
   const { unreadCounts, markConversationAsRead, conversationSettings, setConversationSettings } = useChatStore()
   const { user: currentUser } = useAuthStore()
   const { addToast } = useToastStore()
-  const menuRef = useRef<HTMLDivElement>(null)
 
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [showClearDialog, setShowClearDialog] = useState(false)
@@ -44,18 +43,6 @@ export default function ConversationMenu({
   const otherUser = !isGroup && conversation.participants
     ? conversation.participants.find((p: any) => p.user_id !== currentUser?.user_id)
     : null
-
-  // Close menu when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        onClose()
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [onClose])
 
   const handleMarkAsRead = async () => {
     try {
@@ -319,8 +306,7 @@ export default function ConversationMenu({
   return (
     <>
       <div
-        ref={menuRef}
-        className="z-[99999] w-56 bg-white dark:bg-[#242526] rounded-lg shadow-xl border border-gray-200 dark:border-[#3a3b3c] overflow-hidden"
+        className="w-56 bg-white dark:bg-[#242526] rounded-lg shadow-xl border border-gray-200 dark:border-[#3a3b3c] overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {MENU_ITEMS.map((item, index) => {

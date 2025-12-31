@@ -23,6 +23,7 @@ export default function ChatBox() {
   const { selectedConversation, setMessages, setupWebSocketListeners, markConversationAsRead, setNicknames, loadMessagesFromStorage, getNickname } = useChatStore()
   const [showMembersModal, setShowMembersModal] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
+  const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   // Store realtime participant info (fetched from API)
   const [participantInfos, setParticipantInfos] = useState<Map<number, ParticipantInfo>>(new Map())
@@ -51,18 +52,6 @@ export default function ChatBox() {
       return () => clearInterval(timer)
     }
   }, []) // Empty dependency array - only run once on mount
-
-  // Close menu when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setShowMenu(false)
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
 
   // Load messages when conversation is selected - do NOT use loadMessages callback to avoid stale closure
   useEffect(() => {
@@ -161,23 +150,14 @@ export default function ChatBox() {
         })
         console.log('Sorted messages:', sortedMessages.length)
 
-        // Merge backend messages with cached messages to avoid losing any
-        const currentMessages = useChatStore.getState().messages
-        const currentMessageIds = new Set(currentMessages.map(m => m.id))
-
-        // Add backend messages that are not in current cache
-        const newMessagesFromBackend = sortedMessages.filter((m: any) => !currentMessageIds.has(m.id))
-
-        if (newMessagesFromBackend.length > 0) {
-          console.log('Adding', newMessagesFromBackend.length, 'new messages from backend')
-          const mergedMessages = [...currentMessages, ...newMessagesFromBackend].sort((a, b) => {
-            const dateA = new Date(a.createdAt).getTime()
-            const dateB = new Date(b.createdAt).getTime()
-            return dateA - dateB
-          })
-          setMessages(mergedMessages)
+        // CRITICAL: Only update if API returned new messages (not empty)
+        // This prevents clearing cached messages when API returns 0 messages
+        if (sortedMessages.length > 0) {
+          console.log('Setting messages from API:', selectedConversation.id, 'count:', sortedMessages.length)
+          setMessages(sortedMessages)
         } else {
-          console.log('No new messages from backend, keeping', currentMessages.length, 'cached messages')
+          console.log('API returned 0 messages, keeping cached messages for:', selectedConversation.id)
+          // Keep the cached messages that were set earlier
         }
         console.log('✅ Messages handling complete, total:', useChatStore.getState().messages.length)
       } catch (error) {
@@ -364,6 +344,27 @@ export default function ChatBox() {
     return participantInfo?.avatar_url || otherParticipant?.avatar_url
   }
 
+  const handleMenuToggle = () => {
+    if (!showMenu && menuRef.current) {
+      const rect = menuRef.current.getBoundingClientRect()
+      setMenuPosition({ top: rect.bottom + 4, right: window.innerWidth - rect.right })
+    }
+    setShowMenu(!showMenu)
+  }
+
+  // Close menu when clicking outside - MUST be before early return (Rules of Hooks)
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowMenu(false)
+        setMenuPosition(null)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
   if (!selectedConversation) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center bg-gray-50 dark:bg-[#1c1e21] text-gray-500 dark:text-[#b0b3b8]">
@@ -376,7 +377,7 @@ export default function ChatBox() {
   return (
     <div className="flex-1 flex flex-col bg-gradient-to-b from-gray-50 dark:from-[#1c1e21] to-white dark:to-[#242526]">
       {/* Chat Header */}
-      <div className="h-16 bg-white/80 dark:bg-[#242526]/80 backdrop-blur-xl border-b border-gray-200 dark:border-[#3a3b3c] px-6 flex items-center justify-between shadow-sm relative z-50">
+      <div className="h-16 bg-white/80 dark:bg-[#242526]/80 backdrop-blur-xl border-b border-gray-200 dark:border-[#3a3b3c] px-6 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-3">
           <Avatar
             username={getConversationName()}
@@ -393,26 +394,14 @@ export default function ChatBox() {
         </div>
 
         {/* Options Menu Button */}
-        <div className="relative" ref={menuRef}>
+        <div ref={menuRef}>
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setShowMenu(!showMenu)}
+            onClick={handleMenuToggle}
           >
             <Settings className="w-4 h-4" />
           </Button>
-
-          {/* Full Conversation Menu */}
-          {showMenu && (
-            <ConversationMenu
-              conversation={selectedConversation}
-              onClose={() => setShowMenu(false)}
-              onOpenMembers={() => {
-                setShowMenu(false)
-                setShowMembersModal(true)
-              }}
-            />
-          )}
         </div>
       </div>
 
@@ -421,6 +410,38 @@ export default function ChatBox() {
 
       {/* Message Input */}
       <ChatInput />
+
+      {/* Conversation Menu - Rendered outside ChatHeader's stacking context for proper z-index */}
+      {showMenu && menuPosition && (
+        <>
+          {/* Backdrop overlay - closes menu on click and prevents blocking other UI */}
+          <div
+            className="fixed inset-0 z-[99998]"
+            onClick={() => {
+              setShowMenu(false)
+              setMenuPosition(null)
+            }}
+          />
+          {/* Menu positioned at calculated location */}
+          <div
+            className="fixed z-[99999]"
+            style={{ top: `${menuPosition.top}px`, right: `${menuPosition.right}px` }}
+          >
+            <ConversationMenu
+              conversation={selectedConversation}
+              onClose={() => {
+                setShowMenu(false)
+                setMenuPosition(null)
+              }}
+              onOpenMembers={() => {
+                setShowMenu(false)
+                setMenuPosition(null)
+                setShowMembersModal(true)
+              }}
+            />
+          </div>
+        </>
+      )}
 
       {/* Members Modal - handles all features: add member, leave, delete, nickname */}
       <MembersModal
