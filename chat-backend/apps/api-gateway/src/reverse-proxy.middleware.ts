@@ -82,7 +82,7 @@ export function createReverseProxyMiddleware(
   const proxy = createProxyMiddleware(options);
 
   // Wrapper to handle CORS preflight requests
-  return (req: Request, res: Response, next: any) => {
+  const wrapper: any = (req: Request, res: Response, next: any) => {
     // Handle OPTIONS preflight requests directly at gateway level
     if (req.method === 'OPTIONS') {
       logger.log(`[CORS] Handling preflight request for ${req.headers.origin}`);
@@ -98,6 +98,11 @@ export function createReverseProxyMiddleware(
     // For all other requests, use the proxy
     return proxy(req, res, next);
   };
+
+  // Copy the upgrade property from proxy to wrapper for WebSocket support
+  wrapper.upgrade = proxy.upgrade;
+
+  return wrapper as RequestHandler;
 }
 
 export function createWebSocketProxyMiddleware(
