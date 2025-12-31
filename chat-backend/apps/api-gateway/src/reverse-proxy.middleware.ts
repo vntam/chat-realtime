@@ -4,6 +4,7 @@ import {
   Options,
 } from 'http-proxy-middleware';
 import { Logger } from '@nestjs/common';
+import { Request, Response } from 'express';
 
 const logger = new Logger('ReverseProxy');
 
@@ -78,7 +79,25 @@ export function createReverseProxyMiddleware(
     },
   };
 
-  return createProxyMiddleware(options);
+  const proxy = createProxyMiddleware(options);
+
+  // Wrapper to handle CORS preflight requests
+  return (req: Request, res: Response, next: any) => {
+    // Handle OPTIONS preflight requests directly at gateway level
+    if (req.method === 'OPTIONS') {
+      logger.log(`[CORS] Handling preflight request for ${req.headers.origin}`);
+      res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With,X-Trace-Id');
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader('Access-Control-Max-Age', '600');
+      res.sendStatus(204);
+      return;
+    }
+
+    // For all other requests, use the proxy
+    return proxy(req, res, next);
+  };
 }
 
 export function createWebSocketProxyMiddleware(
