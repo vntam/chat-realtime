@@ -1,8 +1,9 @@
 import { useEffect } from 'react'
 import { Outlet } from 'react-router-dom'
-import { initializeSocket, initializeNotificationSocket, getNotificationSocket } from '@/lib/socket'
+import { initializeSocket, initializeNotificationSocket, getNotificationSocket, getSocket } from '@/lib/socket'
 import { useNotificationStore } from '@/store/notificationStore'
 import { useToastStore } from '@/store/toastStore'
+import { useChatStore } from '@/store/chatStore'
 import type { Notification } from '@/services/notificationService'
 import Header from './Header'
 import Sidebar from './Sidebar'
@@ -10,12 +11,33 @@ import Sidebar from './Sidebar'
 export default function MainLayout() {
   const { addNotification, setUnreadCount } = useNotificationStore()
   const { addToast } = useToastStore()
+  const { setupWebSocketListeners } = useChatStore()
 
   useEffect(() => {
     const token = sessionStorage.getItem('access_token')
     if (token) {
       // Initialize Chat Socket
-      initializeSocket(token)
+      const chatSocket = initializeSocket(token)
+
+      // Setup WebSocket listeners for chat events (conversation:created, message:created, etc.)
+      // This MUST be done in MainLayout so listeners are active even when user is not on Chat page
+      if (chatSocket) {
+        // Wait for socket to be connected before setting up listeners
+        if (chatSocket.connected) {
+          console.log('[MainLayout] Socket already connected, setting up listeners immediately')
+          setupWebSocketListeners()
+        } else {
+          // Wait for socket to connect
+          const timer = setInterval(() => {
+            const currentSocket = getSocket()
+            if (currentSocket?.connected) {
+              console.log('[MainLayout] Socket connected, setting up listeners')
+              clearInterval(timer)
+              setupWebSocketListeners()
+            }
+          }, 100)
+        }
+      }
 
       // Initialize Notification Socket
       initializeNotificationSocket(token)
