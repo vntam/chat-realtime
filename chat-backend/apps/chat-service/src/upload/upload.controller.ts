@@ -20,7 +20,7 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { UploadService } from './upload.service';
-import { AuthGuard } from '@app/common/guards/auth.guard';
+import { JwtJwtAuthGuard } from '../guards/jwt-auth.guard';
 import { GetCurrentUser } from '@app/common/decorators/get-current-user.decorator';
 
 interface UploadBase64Dto {
@@ -48,7 +48,7 @@ export class UploadController {
   }
 
   @Post('avatar-base64')
-  @UseGuards(AuthGuard)
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Upload avatar as Base64 (avoids multipart issues)' })
   @ApiResponse({
     status: 201,
