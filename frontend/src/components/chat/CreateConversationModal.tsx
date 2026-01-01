@@ -84,8 +84,29 @@ export default function CreateConversationModal({ open, onClose }: CreateConvers
         name: isGroup ? groupName.trim() : undefined,
       })
 
-      addConversation(conversation)
-      selectConversation(conversation)
+      // Populate participants with user info to avoid "Unknown" display
+      const allUserIds = [...selectedUsers, currentUser?.user_id || 0].filter(id => id > 0)
+      const users = await userService.getUsersByIds(allUserIds)
+      const userMap = new Map(users.map((u) => [u.user_id, u]))
+
+      // Create populated conversation with user details
+      const populatedConversation = {
+        ...conversation,
+        participants: conversation.participants.map((p: any) => {
+          const userId = typeof p === 'number' ? p : parseInt(p.id || p.user_id || '0')
+          const user = userMap.get(userId)
+          return {
+            id: String(userId),
+            user_id: userId,
+            name: user?.username || `User ${userId}`,
+            email: user?.email || '',
+            avatar_url: user?.avatar_url,
+          }
+        }),
+      }
+
+      addConversation(populatedConversation)
+      selectConversation(populatedConversation)
       onClose()
     } catch (error: any) {
       console.error('Failed to create conversation:', error)

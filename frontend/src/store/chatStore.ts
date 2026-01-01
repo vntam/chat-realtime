@@ -799,7 +799,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
 
     // Handler for conversation:created events
-    conversationCreatedHandler = (data: any) => {
+    conversationCreatedHandler = async (data: any) => {
       console.log('Received conversation:created event:', data)
 
       const conversation = data.conversation || data
@@ -839,13 +839,47 @@ export const useChatStore = create<ChatState>((set, get) => ({
         return
       }
 
+      // Extract participant IDs
+      const participantIds: number[] = (conversation.participants || []).map((p: any) => {
+        return typeof p === 'number' ? p : parseInt(p.id || p.user_id || p.userId || '0')
+      }).filter((id: number) => !isNaN(id) && id > 0)
+
+      // Fetch user details for all participants
+      let populatedParticipants = conversation.participants || []
+      if (participantIds.length > 0) {
+        try {
+          const users = await userService.getUsersByIds(participantIds)
+          const userMap = new Map(users.map((u) => [u.user_id, u]))
+
+          populatedParticipants = participantIds.map((userId) => {
+            const user = userMap.get(userId)
+            return {
+              id: String(userId),
+              user_id: userId,
+              name: user?.username || `User ${userId}`,
+              email: user?.email || '',
+              avatar_url: user?.avatar_url,
+            }
+          })
+        } catch (error) {
+          console.error('[chatStore] Failed to fetch participant info:', error)
+          // Fallback to basic structure
+          populatedParticipants = participantIds.map((userId) => ({
+            id: String(userId),
+            user_id: userId,
+            name: `User ${userId}`,
+            email: '',
+          }))
+        }
+      }
+
       // Transform conversation to match frontend type
       const transformedConversation: Conversation = {
         id: conversationId,
         name: conversation.name,
         isGroup: conversation.isGroup || conversation.is_group || false,
         status: conversation.status,
-        participants: conversation.participants || [],
+        participants: populatedParticipants,
         lastMessage: conversation.lastMessage,
         createdAt: conversation.created_at || conversation.createdAt,
         updatedAt: conversation.updated_at || conversation.updatedAt,
