@@ -164,6 +164,66 @@ export default function ChatMessages() {
     }
   }, [selectedConversation?.id]) // Only run when conversation ID changes, NOT on every message update
 
+  // Listen to message:status events to refresh read receipts in real-time
+  useEffect(() => {
+    const socket = getSocket()
+    if (!socket) return
+
+    const handleMessageStatus = (data: any) => {
+      console.log('[ChatMessages] Received message:status event:', data)
+
+      // Re-fetch read users to update avatar positions (follow-reader logic)
+      const refreshReadUsers = async () => {
+        const currentMessages = useChatStore.getState().messages
+        if (!currentMessages || currentMessages.length === 0) return
+
+        const newReadUsers = new Map<string, UserAvatar[]>()
+        const currentAnimated = animatedReadUsersRef.current
+
+        for (const message of currentMessages) {
+          if (!message.delivery_info || message.delivery_info.length === 0) continue
+
+          const readerIds = message.delivery_info
+            .filter((d: DeliveryInfo) => d.status === 'read')
+            .map((d: DeliveryInfo) => d.user_id)
+
+          if (readerIds.length === 0) continue
+
+          const senderId = message.sender?.id ? parseInt(message.sender.id) : null
+          const otherReaderIds = readerIds.filter((id) => id !== senderId)
+
+          if (otherReaderIds.length === 0) continue
+
+          try {
+            const users = await userService.getUsersByIds(otherReaderIds)
+            newReadUsers.set(message.id, users)
+
+            // Only animate NEW readers (not previously animated for this specific message)
+            users.forEach((user) => {
+              const key = `${message.id}_${user.user_id}`
+              if (!currentAnimated.has(key)) {
+                currentAnimated.add(key)
+              }
+            })
+          } catch (error) {
+            console.error('[ChatMessages] Failed to fetch read users:', error)
+          }
+        }
+
+        setReadUsers(newReadUsers)
+        console.log('[ChatMessages] Refreshed read users after message:status event')
+      }
+
+      refreshReadUsers()
+    }
+
+    socket.on('message:status', handleMessageStatus)
+
+    return () => {
+      socket.off('message:status', handleMessageStatus)
+    }
+  }, []) // Empty dependency - setup ONCE and persist
+
   // Fetch latest info (username + avatar) for all senders in conversation (realtime updates)
   useEffect(() => {
     const fetchSenderInfos = async () => {
