@@ -766,6 +766,48 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       state.addMessage(transformedMessage)
       if (transformedMessage.conversationId) {
+        // CRITICAL: Check if conversation exists in list
+        // If not (was deleted), fetch it from backend to restore it
+        const currentState = get()
+        const conversationExists = currentState.conversations.some(c => c.id === transformedMessage.conversationId)
+
+        if (!conversationExists) {
+          console.log('[chatStore] Conversation not found (was deleted), fetching from backend:', transformedMessage.conversationId)
+          try {
+            const { chatService } = await import('@/services/chatService')
+            const restoredConversation = await chatService.getConversationById(transformedMessage.conversationId)
+
+            // Populate participants with user info
+            const participantIds = restoredConversation.participants.map((p: any) =>
+              typeof p === 'number' ? p : parseInt(p.id || p.user_id || '0')
+            ).filter((id: number) => !isNaN(id) && id > 0)
+
+            if (participantIds.length > 0) {
+              const users = await userService.getUsersByIds(participantIds)
+              const userMap = new Map(users.map((u) => [u.user_id, u]))
+
+              restoredConversation.participants = participantIds.map((userId: number) => {
+                const user = userMap.get(userId)
+                return {
+                  id: String(userId),
+                  user_id: userId,
+                  name: user?.username || `User ${userId}`,
+                  email: user?.email || '',
+                  avatar_url: user?.avatar_url,
+                }
+              })
+            }
+
+            // Add conversation back to list (unset hidden setting)
+            state.addConversation(restoredConversation)
+            // Clear hidden setting if exists
+            state.setConversationSettings(transformedMessage.conversationId, { hidden: false })
+            console.log('[chatStore] Conversation restored from backend:', transformedMessage.conversationId)
+          } catch (error) {
+            console.error('[chatStore] Failed to restore conversation:', error)
+          }
+        }
+
         state.updateConversationLastMessage(transformedMessage.conversationId, transformedMessage)
 
         // Increment unread count if message is from another user
@@ -777,8 +819,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
           // CRITICAL: Unhide conversation if it was hidden
           // When receiving a new message from someone else, the conversation should reappear
-          const currentState = get()
-          const conversationSettings = currentState.conversationSettings.get(transformedMessage.conversationId)
+          const stateAfterUpdate = get()
+          const conversationSettings = stateAfterUpdate.conversationSettings.get(transformedMessage.conversationId)
           if (conversationSettings?.hidden) {
             console.log('[chatStore] Unhiding conversation due to new message:', transformedMessage.conversationId)
             state.setConversationSettings(transformedMessage.conversationId, { hidden: false })
