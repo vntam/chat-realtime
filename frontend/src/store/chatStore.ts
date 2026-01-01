@@ -38,7 +38,7 @@ interface ChatState {
   setConversations: (conversations: Conversation[]) => void
   addConversation: (conversation: Conversation) => void
   selectConversation: (conversation: Conversation | null) => void
-  setMessages: (messages: Message[]) => void
+  setMessages: (messages: Message[], expectedConversationId?: string) => void
   addMessage: (message: Message) => void
   updateMessage: (messageId: string, updates: Partial<Message>) => void
   loadMessagesFromStorage: (conversationId: string | undefined) => Message[]
@@ -314,13 +314,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
   selectConversation: (conversation) =>
     set({ selectedConversation: conversation }),
 
-  setMessages: (messages) => {
-    const conversationId = get().selectedConversation?.id
-    console.log('[chatStore] setMessages called with', messages.length, 'messages')
-    console.log('[chatStore] Messages sample:', messages[0])
+  setMessages: (messages, expectedConversationId) => {
+    const currentConversationId = get().selectedConversation?.id
+
+    // CRITICAL: Validate conversation ID to prevent race condition
+    // If expectedConversationId is provided, only set messages if it matches current conversation
+    if (expectedConversationId && currentConversationId !== expectedConversationId) {
+      console.log('[chatStore] setMessages: Conversation mismatch, ignoring', {
+        expected: expectedConversationId,
+        current: currentConversationId,
+      })
+      return
+    }
+
+    console.log('[chatStore] setMessages called with', messages.length, 'messages for conversation:', currentConversationId)
     set({ messages })
     // Save to localStorage
-    saveMessagesToStorage(conversationId, messages)
+    saveMessagesToStorage(currentConversationId, messages)
     console.log('[chatStore] Messages set to store, current length:', get().messages.length)
   },
 

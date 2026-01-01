@@ -64,10 +64,10 @@ export default function ChatBox() {
       const cachedMessages = loadMessagesFromStorage(selectedConversation.id)
       if (cachedMessages.length > 0) {
         console.log('Loaded', cachedMessages.length, 'messages from localStorage cache')
-        setMessages(cachedMessages)
+        setMessages(cachedMessages, selectedConversation.id)  // Pass expected conversation ID
       } else {
         // Clear messages immediately when switching conversations
-        setMessages([])
+        setMessages([], selectedConversation.id)  // Pass expected conversation ID
         console.log('Messages cleared, preparing to load new messages')
       }
 
@@ -154,7 +154,7 @@ export default function ChatBox() {
         // This prevents clearing cached messages when API returns 0 messages
         if (sortedMessages.length > 0) {
           console.log('Setting messages from API:', selectedConversation.id, 'count:', sortedMessages.length)
-          setMessages(sortedMessages)
+          setMessages(sortedMessages, selectedConversation.id)  // Pass expected conversation ID to prevent race condition
         } else {
           console.log('API returned 0 messages, keeping cached messages for:', selectedConversation.id)
           // Keep the cached messages that were set earlier
