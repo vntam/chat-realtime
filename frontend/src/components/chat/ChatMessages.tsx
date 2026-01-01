@@ -30,9 +30,22 @@ interface MessageGroup {
 const getMessageType = (content: string): 'text' | 'image' | 'file' => {
   if (!content) return 'text'
 
+  const lowerContent = content.toLowerCase().trim()
+
+  // Check for Data URL (base64) images - PRIORITY CHECK
+  // Format: data:image/<type>;base64,<data>
+  if (lowerContent.startsWith('data:image/')) {
+    return 'image'
+  }
+
+  // Check for Data URL (base64) files
+  // Format: data:<mime-type>;base64,<data>
+  if (lowerContent.startsWith('data:application/') || lowerContent.startsWith('data:text/')) {
+    return 'file'
+  }
+
   // Check if content is an image URL
   const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp']
-  const lowerContent = content.toLowerCase().trim()
 
   // Check for image URLs (common patterns)
   if (
