@@ -19,7 +19,7 @@ interface CreateConversationModalProps {
 
 export default function CreateConversationModal({ open, onClose }: CreateConversationModalProps) {
   const { user: currentUser } = useAuthStore()
-  const { addConversation, selectConversation } = useChatStore()
+  const { selectConversation } = useChatStore()
 
   const [users, setUsers] = useState<User[]>([])
   const [selectedUsers, setSelectedUsers] = useState<number[]>([])
@@ -84,30 +84,22 @@ export default function CreateConversationModal({ open, onClose }: CreateConvers
         name: isGroup ? groupName.trim() : undefined,
       })
 
-      // Populate participants with user info to avoid "Unknown" display
-      const allUserIds = [...selectedUsers, currentUser?.user_id || 0].filter(id => id > 0)
-      const users = await userService.getUsersByIds(allUserIds)
-      const userMap = new Map(users.map((u) => [u.user_id, u]))
+      // Store conversation ID for WebSocket handler to auto-select
+      // Note: We don't call addConversation here to avoid duplicates
+      // WebSocket event will handle adding it to the store
+      const createdConversationId = conversation.id || (conversation as any)._id
 
-      // Create populated conversation with user details
-      const populatedConversation = {
-        ...conversation,
-        participants: conversation.participants.map((p: any) => {
-          const userId = typeof p === 'number' ? p : parseInt(p.id || p.user_id || '0')
-          const user = userMap.get(userId)
-          return {
-            id: String(userId),
-            user_id: userId,
-            name: user?.username || `User ${userId}`,
-            email: user?.email || '',
-            avatar_url: user?.avatar_url,
-          }
-        }),
-      }
-
-      addConversation(populatedConversation)
-      selectConversation(populatedConversation)
+      // Close modal - WebSocket handler will add and select the conversation
       onClose()
+
+      // Auto-select after a short delay (in case WebSocket is slow)
+      setTimeout(() => {
+        const state = useChatStore.getState()
+        const conv = state.conversations.find(c => c.id === createdConversationId)
+        if (conv) {
+          selectConversation(conv)
+        }
+      }, 500)
     } catch (error: any) {
       console.error('Failed to create conversation:', error)
       alert(error.response?.data?.message || 'Không thể tạo hội thoại')

@@ -889,6 +889,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
       set((state) => ({
         conversations: [transformedConversation, ...state.conversations],
       }))
+
+      // Auto-select the newly created conversation for better UX
+      const newState = get()
+      if (!newState.selectedConversation) {
+        console.log('Auto-selecting newly created conversation:', transformedConversation.id)
+        set({ selectedConversation: transformedConversation })
+      }
     }
 
     // Handler for conversation:deleted events
