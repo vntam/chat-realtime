@@ -20,7 +20,7 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { UploadService } from './upload.service';
-import { JwtJwtAuthGuard } from '../guards/jwt-auth.guard';
+import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { GetCurrentUser } from '@app/common/decorators/get-current-user.decorator';
 
 interface UploadBase64Dto {
