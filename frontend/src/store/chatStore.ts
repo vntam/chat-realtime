@@ -774,6 +774,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
         if (!isSystemMessage && !isFromCurrentUser && !isSelectedConversation) {
           state.incrementUnreadCount(transformedMessage.conversationId)
+
+          // CRITICAL: Unhide conversation if it was hidden
+          // When receiving a new message from someone else, the conversation should reappear
+          const currentState = get()
+          const conversationSettings = currentState.conversationSettings.get(transformedMessage.conversationId)
+          if (conversationSettings?.hidden) {
+            console.log('[chatStore] Unhiding conversation due to new message:', transformedMessage.conversationId)
+            state.setConversationSettings(transformedMessage.conversationId, { hidden: false })
+          }
         }
       }
     }
