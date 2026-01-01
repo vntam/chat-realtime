@@ -202,6 +202,56 @@ export default function ChatMessages() {
     fetchSenderInfos()
   }, [selectedConversation?.id]) // Only fetch when conversation ID changes, NOT messages (to avoid infinite loop)
 
+  // Listen to user:profile-updated event to refresh sender avatars in realtime
+  useEffect(() => {
+    const socket = getSocket()
+    if (!socket) return
+
+    const handleUserProfileUpdated = (data: any) => {
+      console.log('[ChatMessages] Received user:profile-updated event:', data)
+
+      // Re-fetch sender infos to get the latest avatar/username for ALL messages in conversation
+      const refreshSenderInfos = async () => {
+        const currentMessages = useChatStore.getState().messages
+        if (!currentMessages || currentMessages.length === 0) return
+
+        const senderIds = new Set<number>()
+        for (const message of currentMessages) {
+          if (message.sender?.id) {
+            senderIds.add(parseInt(message.sender.id))
+          }
+        }
+
+        if (senderIds.size === 0) return
+
+        try {
+          const users = await userService.getUsersByIds(Array.from(senderIds))
+          const infoMap = new Map<number, SenderInfo>()
+
+          users.forEach((user) => {
+            infoMap.set(user.user_id, {
+              username: user.username,
+              avatar_url: user.avatar_url,
+            })
+          })
+
+          setSenderInfos(infoMap)
+          console.log('[ChatMessages] Refreshed sender infos after profile update:', infoMap)
+        } catch (error) {
+          console.error('[ChatMessages] Failed to refresh sender infos:', error)
+        }
+      }
+
+      refreshSenderInfos()
+    }
+
+    socket.on('user:profile-updated', handleUserProfileUpdated)
+
+    return () => {
+      socket.off('user:profile-updated', handleUserProfileUpdated)
+    }
+  }, []) // Empty dependency - setup ONCE and persist
+
   const formatTime = (dateString: string) => {
     const date = new Date(dateString)
     return date.toLocaleTimeString('vi-VN', {
