@@ -1114,6 +1114,51 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
     }
   }
 
+  @SubscribeMessage('conversation:update-avatar')
+  async handleUpdateAvatar(
+    @ConnectedSocket() client: AuthSocket,
+    @MessageBody() payload: { conversationId: string; avatarUrl: string; actorName?: string },
+  ): Promise<WsAck> {
+    try {
+      this.logger.log(`[UpdateAvatar] Updating avatar for conversation ${payload.conversationId}`);
+
+      // Update conversation avatar in database
+      const conversation = await this.chatService.updateConversationAvatar(
+        payload.conversationId,
+        payload.avatarUrl,
+        client.userId!,
+      );
+
+      // Broadcast to all participants for realtime update
+      const conversationRoom = `conversation:${payload.conversationId}`;
+      this.server.to(conversationRoom).emit('conversation:avatar-updated', {
+        conversationId: payload.conversationId,
+        avatarUrl: payload.avatarUrl,
+        actorName: payload.actorName,
+      });
+
+      // Also broadcast to all participants' personal rooms
+      if (conversation && conversation.participants) {
+        for (const participantId of conversation.participants) {
+          this.server.to(`user:${participantId}`).emit('conversation:avatar-updated', {
+            conversationId: payload.conversationId,
+            avatarUrl: payload.avatarUrl,
+            actorName: payload.actorName,
+          });
+        }
+      }
+
+      this.logger.log(`[UpdateAvatar] Avatar updated successfully for conversation ${payload.conversationId}`);
+      return this.ack(true, { conversation });
+    } catch (error) {
+      this.logger.error(`Update avatar error: ${error.message}`);
+      return this.ack(false, null, {
+        code: error.status === 403 ? 'FORBIDDEN' : 'BAD_REQUEST',
+        message: error.message,
+      });
+    }
+  }
+
   // ============ NOTIFICATION HELPER ============
 
   /**

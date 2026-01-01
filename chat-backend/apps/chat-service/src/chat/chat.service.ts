@@ -1443,4 +1443,41 @@ export class ChatService {
       `[ChatService] Group conversation ${conversationId} deleted by admin ${userId}`,
     );
   }
+
+  /**
+   * Update conversation avatar (for group chats)
+   * Only admin can update group avatar
+   */
+  async updateConversationAvatar(
+    conversationId: string,
+    avatarUrl: string,
+    userId: number,
+  ): Promise<Conversation> {
+    this.logger.log(
+      `[ChatService] User ${userId} updating avatar for conversation ${conversationId}`,
+    );
+
+    const conversation = await this.findConversationById(conversationId);
+
+    // Only allow admin to update group avatar
+    if (conversation.admin_id !== userId) {
+      throw new ForbiddenException(
+        'Only admin can update group avatar',
+      );
+    }
+
+    // Update avatar in database
+    conversation.avatar = avatarUrl;
+    const updated = await this.conversationModel.findByIdAndUpdate(
+      conversationId,
+      { avatar: avatarUrl },
+      { new: true },
+    ).exec();
+
+    this.logger.log(
+      `[ChatService] Avatar updated for conversation ${conversationId}`,
+    );
+
+    return updated;
+  }
 }

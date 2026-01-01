@@ -1148,7 +1148,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     conversationAvatarUpdatedHandler = (data: any) => {
       console.log('Received conversation:avatar-updated event:', data)
 
-      const { conversationId, avatar } = data
+      const { conversationId, avatarUrl } = data
       if (!conversationId) {
         console.log('Invalid avatar-updated data, ignoring')
         return
@@ -1157,12 +1157,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
       // Update conversation in store
       set((state) => {
         const updatedConversations = state.conversations.map((c) =>
-          c.id === conversationId ? { ...c, avatar } : c
+          c.id === conversationId ? { ...c, avatar: avatarUrl } : c
         )
 
         let updatedSelected = state.selectedConversation
         if (state.selectedConversation?.id === conversationId) {
-          updatedSelected = { ...state.selectedConversation, avatar } as Conversation
+          updatedSelected = { ...state.selectedConversation, avatar: avatarUrl } as Conversation
         }
 
         return {
@@ -1171,7 +1171,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }
       })
 
-      console.log('Conversation avatar updated:', conversationId, avatar)
+      console.log('Conversation avatar updated:', conversationId, avatarUrl)
     }
 
     // Handler for conversation name updated events
