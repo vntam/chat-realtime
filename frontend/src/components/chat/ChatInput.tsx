@@ -18,6 +18,7 @@ export default function ChatInput() {
   const blockedByUsers = useChatStore((state) => state.blockedByUsers)
   const addMessage = useChatStore((state) => state.addMessage)
   const updateConversationLastMessage = useChatStore((state) => state.updateConversationLastMessage)
+  const markConversationAsRead = useChatStore((state) => state.markConversationAsRead)
 
   const [message, setMessage] = useState('')
   const [isSending, setIsSending] = useState(false)
@@ -190,6 +191,14 @@ export default function ChatInput() {
     setTimeout(() => {
       handleSubmit(e)
     }, 0)
+  }
+
+  // Mark conversation as read when user focuses on input
+  const handleInputFocus = () => {
+    if (selectedConversation && !isInputDisabled) {
+      console.log('[ChatInput] User focused, marking conversation as read:', selectedConversation.id)
+      markConversationAsRead(selectedConversation.id)
+    }
   }
 
   const handleEmojiSelect = (emoji: string) => {
@@ -386,6 +395,7 @@ export default function ChatInput() {
             placeholder={getPlaceholder()}
             value={message}
             onChange={(e) => setMessage(e.target.value)}
+            onFocus={handleInputFocus}
             disabled={isSending || isInputDisabled}
             className="w-full bg-gray-50 dark:bg-[#1c1e21] border-gray-200 dark:border-[#3a3b3c] focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl px-4 py-3 text-sm transition-smooth text-gray-900 dark:text-[#e4e6eb] placeholder:text-gray-400 dark:placeholder:text-[#b0b3b8]"
           />
