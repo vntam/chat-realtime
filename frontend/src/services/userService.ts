@@ -107,7 +107,7 @@ export const userService = {
         base64: base64,
       },
       {
-        timeout: 30000, // 30 seconds
+        timeout: 15000, // 15 seconds (enough for 500KB Base64 upload)
       }
     )
     console.log('[userService] uploadAvatar response:', response.data)

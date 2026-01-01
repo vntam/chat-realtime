@@ -53,6 +53,14 @@ export default function ChatBox() {
     }
   }, []) // Empty dependency array - only run once on mount
 
+  // CRITICAL: Reset menu state when conversation changes to prevent menu overlap
+  useEffect(() => {
+    // Close menu when switching conversations
+    setShowMenu(false)
+    setMenuPosition(null)
+    setShowMembersModal(false)
+  }, [selectedConversation?.id])
+
   // Load messages when conversation is selected - do NOT use loadMessages callback to avoid stale closure
   useEffect(() => {
     const loadMessagesDirectly = async () => {

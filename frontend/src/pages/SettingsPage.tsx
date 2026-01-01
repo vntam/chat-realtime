@@ -228,7 +228,11 @@ export default function SettingsPage() {
       setSuccessMessage('Cập nhật thông tin thành công!')
       setTimeout(() => setSuccessMessage(''), 3000)
       setAvatarFile(null)
-      setPreviewAvatar(null)
+      // CRITICAL: Set preview to the uploaded URL to ensure avatar displays
+      // This keeps the avatar visible even if user refresh fails
+      if (avatarUrl) {
+        setPreviewAvatar(avatarUrl)
+      }
     } catch (error: any) {
       console.error('[SettingsPage] Failed to update profile:', error)
       console.error('[SettingsPage] Error response:', error.response)
