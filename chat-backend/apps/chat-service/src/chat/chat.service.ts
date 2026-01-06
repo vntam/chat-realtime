@@ -1478,6 +1478,6 @@ export class ChatService {
       `[ChatService] Avatar updated for conversation ${conversationId}`,
     );
 
-    return updated;
+    return updated!;
   }
 }
